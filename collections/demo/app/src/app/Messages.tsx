@@ -4,9 +4,7 @@ import MessagesList from "./MessagesList";
 function Messages() {
   return (
     <div className="channel-view">
-      <div className="messages">
-        <MessagesList />
-      </div>
+      <MessagesList />
 
       <div className="input">
         <textarea placeholder="Type a message when you're ready"></textarea>

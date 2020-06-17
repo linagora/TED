@@ -64,14 +64,13 @@ body {
 }
 .channel-view .messages {
   flex: 1;
-  padding: 16px;
-  width: 100%;
-  max-width: 1000px;
-  margin-left: auto;
-  margin-right: auto;
+  display: flex;
+}
+.channel-view .messages .list {
+  flex: 1;
 }
 .channel-view .input {
-  height: 100px;
+  height: 80px;
   border-top: 1px solid #f5f5f7;
   width: 100%;
   text-align: center;
@@ -79,18 +78,26 @@ body {
 .channel-view .input textarea {
   border: 0px;
   height: 100%;
-  font-size: 16px;
+  overflow: scroll;
+  resize: none;
+  font-size: 14px;
   padding: 16px;
   width: 100%;
   max-width: 1000px;
   margin-left: auto;
   margin-right: auto;
   outline: none;
+  box-sizing: border-box;
 }
 .message {
   width: 100%;
   display: flex;
-  margin-top: 16px;
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 16px;
+  left: 0;
+  right: 0;
 }
 .message .head {
   width: 28px;
@@ -103,39 +110,11 @@ body {
 .message .content {
   flex: 1;
   vertical-align: top;
+  font-size: 14px;
+  padding-bottom: 8px;
+  line-height: 20px;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.ReactVirtualized__Grid {
+  outline: none;
 }
