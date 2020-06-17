@@ -5,7 +5,7 @@
   "main": "index.js",
   "repository": "https://github.com/TwakeApp/Twake-Collections",
   "author": "Romaric Mourgues at Linagora",
-  "license": "AGPL3",
+  "license": "AGPL-3.0",
   "private": false,
   "dependencies": {
     "@testing-library/jest-dom": "^4.2.4",
@@ -18,6 +18,8 @@
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-scripts": "3.4.1",
+    "react-virtualized": "^9.21.2",
+    "twake-collections-client": "file:../../client",
     "typescript": "~3.7.2"
   },
   "scripts": {

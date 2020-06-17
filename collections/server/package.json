@@ -4,7 +4,7 @@
   "description": "Twake Collections is a replicated, encrypted, scalable and in realtime collections based database for Twake on top of Cassandra.",
   "repository": "https://github.com/TwakeApp/Twake-Collections",
   "author": "Romaric Mourgues at Linagora",
-  "license": "AGPL3",
+  "license": "AGPL-3.0",
   "private": false,
   "main": "build/index.js",
   "module": "build/index.es.js",
