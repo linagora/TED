@@ -9,10 +9,23 @@ const client = new cassandra.Client(
   localDataCenter: 'datacenter1'
 });
 
+const defaultKeyspaceOptions:KeyspaceReplicationOptions = {
+  class:"SimpleStrategy",
+  replication_factor:3
+};
+
 client.connect();
-let keyspace:string = "excelsir";
+let keyspace:string = "twake_collections";
 let initQuery = "USE " + keyspace;
-client.execute(initQuery);
+client.execute(initQuery)
+.catch( async (err:CQLResponseError) => 
+{
+  if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
+  {
+    return await createKeyspace(keyspace, defaultKeyspaceOptions);
+  }
+});
+
 
 
 enum action 
@@ -21,46 +34,69 @@ enum action
   get = "get",
   remove = "remove",
   configure = "configure",
-  createTable = "createTable"
-}
+  batch = "batch"
+};
+
+
+type KeyspaceReplicationOptions = {
+  class:"SimpleStrategy" | "NetworkTopologyStrategy" | "OldNetworkTopologyStrategy";
+  replication_factor?:number;
+  datacentersRF?:JSON;
+};
+
+type SaveOptions = {
+  ttl?:number;
+};
+
+type Filter = {
+  //TODO
+};
+
+type Order = {
+  //TODO
+};
 
 type ServerBaseRequest = {
-  action: action,
-  path:string,
-  object?:any,
-  options?:any,
-  filter?:any,
-  order?:any,
-  limit?:number,
-  pageToken?:string
-}
+  action: action;
+  path:string;
+  object?:StorageType;
+  options?:SaveOptions | any;
+  filter?:Filter;
+  order?:Order;
+  limit?:number;
+  pageToken?:string;
+};
 
 type CQLResponseError = {
-  name:string,
-  info:string,
-  message:string,
-  code:number,
-  query:string
-}
+  name:string;
+  info:string;
+  message:string;
+  code:number;
+  query:string;
+};
 
 type Query = {
   queryTxt:string;
   params:string[];
-}
+};
 
 type QueryResult = {
   resultCount:number;
   results:JSON[];
+};
+
+type EmptyResult = {
+  status:string;
 }
 
 type StorageType = {
   [key:string]:string;
   content:any;  
-}
+};
 
 type TableOptions = {
  //TODO
-}
+};
 
 let defaultTableOptions:TableOptions = {
   //TODO
@@ -87,7 +123,7 @@ abstract class BaseOperation
 
   protected abstract buildQuery():void;
 
-  public async execute():Promise<QueryResult | CQLResponseError | null>
+  public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
   {
     if(this.query === null) throw new Error("unable to execute CQL operation, query not built");
     console.log(this.query.queryTxt);
@@ -110,6 +146,7 @@ abstract class BaseOperation
       {
         this.documents.push(names[i]);
         let nameCtrl = names[i].match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        console.log(names[i]);
         if(nameCtrl === null) throw new Error("Invalid document ID");
       }      
     }
@@ -157,12 +194,12 @@ abstract class BaseOperation
     //Add tableOtions
     //TODO
   }
-}
+};
 
 class SaveOperation extends BaseOperation
 {
   object:StorageType;
-  options?:string;
+  options?:SaveOptions;
 
   tableCreationFlag:boolean = false;
   tableOptions?:TableOptions;
@@ -171,6 +208,7 @@ class SaveOperation extends BaseOperation
   {
     super(request);
     if(this.documents.length != this.collections.length) throw new Error("Invalid path length parity for a save operation");
+    if(request.object === undefined) throw new Error("Missing field object for a save operation")
     this.object = request.object;
     this.options = request.options;
     this.fillObjectKey();
@@ -180,14 +218,29 @@ class SaveOperation extends BaseOperation
   protected buildQuery():void
   {
     let tableName:string = super.buildTableName();
-    this.query = {queryTxt: "INSERT INTO " + tableName + " JSON '" + JSON.stringify(this.object) + "'", params: []};
+    let keys:string = "(";
+    let placeholders:string = "(";
+    let params:string[] = [];
+    Object.entries(this.object).forEach(([key, value]:string[]) => 
+    {
+      keys = keys + key + ", ";
+      placeholders = placeholders + "? , ";
+      params.push(value)
+    })
+    keys = keys.slice(0,-2) + ")";
+    placeholders = placeholders.slice(0,-2) + ")";
+    this.query = {queryTxt: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders, params: params};
+
     if( this.options != undefined)
     {
-      //TODO
+      this.query.queryTxt = this.query.queryTxt + " USING ";
+      if(this.options.ttl != undefined) this.query.queryTxt = this.query.queryTxt + " TTL " + this.options.ttl + " AND ";
+      //Add other options
+      this.query.queryTxt = this.query.queryTxt.slice(0,-4);
     }
   }
 
-  public async execute():Promise<QueryResult | CQLResponseError | null>
+  public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
   {
     return await super.execute()
     .catch(async (err:CQLResponseError) =>
@@ -209,12 +262,12 @@ class SaveOperation extends BaseOperation
       this.object[this.collections[i]] = this.documents[i];
     }
   }
-}
+};
 
 class GetOperation extends BaseOperation
 {
-  filter?:JSON;
-  order?:string;
+  filter?:Filter;
+  order?:Order;
   limit?:number;
   pageToken?:string;
 
@@ -246,7 +299,7 @@ class GetOperation extends BaseOperation
       //TODO
     }
   }
-}
+};
 
 class RemoveOperation extends BaseOperation
 {
@@ -266,23 +319,23 @@ class RemoveOperation extends BaseOperation
       params: whereClause.params 
     };
   }
-}
+};
 
-/* class batchOperation extends BaseOperation
+/* class BatchOperation
 {
   //TODO
-}
- */
+} */
 
-async function runDB(query:Query):Promise<QueryResult | null>
+
+async function runDB(query:Query):Promise<QueryResult | EmptyResult>
 {
   let rs:any;
   rs = await client.execute(query.queryTxt, query.params, {prepare: true});
   const ans = rs.first();
-  console.log(rs);
+  console.log(rs.info);
   if(ans == null)
   {
-    return null;
+    return {status: "Query successful. No result to display"};
   }
   let result:QueryResult = {resultCount:rs.rowLength, results:[]};
   for(let i:number = 0; i<result.resultCount; i++)
@@ -291,8 +344,17 @@ async function runDB(query:Query):Promise<QueryResult | null>
   }
   console.log("Result =",result);
   return result;
-}
+};
 
+async function createKeyspace(keyspaceName:string, options:KeyspaceReplicationOptions):Promise<void>
+{
+  let nameCtrl = keyspaceName.match(/^[a-zA-Z\_]*$/);
+  if(nameCtrl === null) throw new Error("Invalid keyspace name");
+  let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
+  res = res.split('"').join("'");
+  console.log(res);
+  await runDB({queryTxt:res, params:[]});
+};
 
 
 export default function createOperation(request:ServerBaseRequest):BaseOperation
@@ -332,4 +394,4 @@ export default function createOperation(request:ServerBaseRequest):BaseOperation
     console.log("Failed to create operation: \n",err);
     throw err;
   }
-}
+};

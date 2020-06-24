@@ -1,5 +1,6 @@
 import * as http from "http";
 import createOperation from "./CQLOperations";
+import { type } from "os";
 
  //=================================================
  //                TEST CODE
@@ -52,7 +53,7 @@ http.createServer(async function(req: any, res: any)
   catch(err)
   {
     console.log("catch2 \n",err);
-    res.write(JSON.stringify(err));
+    res.write('{"status":"' + err.toString() + '"}');
     res.end();
   }
   
