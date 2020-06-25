@@ -1,6 +1,7 @@
 import cassandra from "cassandra-driver";
 import { table } from "console";
 import { kMaxLength } from "buffer";
+import { Serializer } from "v8";
 //import uuid from "uuid";
 
 const client = new cassandra.Client(
@@ -22,11 +23,9 @@ client.execute(initQuery)
 {
   if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
   {
-    return await createKeyspace(keyspace, defaultKeyspaceOptions);
+    return await createKeyspace(keyspace, defaultKeyspaceOptions).then( () => client.execute(initQuery));
   }
 });
-
-
 
 enum action 
 {
@@ -37,6 +36,7 @@ enum action
   batch = "batch"
 };
 
+type QueryOptions = cassandra.QueryOptions;
 
 type KeyspaceReplicationOptions = {
   class:"SimpleStrategy" | "NetworkTopologyStrategy" | "OldNetworkTopologyStrategy";
@@ -65,6 +65,7 @@ type ServerBaseRequest = {
   order?:Order;
   limit?:number;
   pageToken?:string;
+  operations?:ServerBaseRequest[];
 };
 
 type CQLResponseError = {
@@ -76,9 +77,15 @@ type CQLResponseError = {
 };
 
 type Query = {
-  queryTxt:string;
+  query:string;
   params:string[];
 };
+
+const defaultQueryOptions:QueryOptions = {
+  keyspace:keyspace,
+  prepare:true,
+
+}
 
 type QueryResult = {
   resultCount:number;
@@ -102,7 +109,13 @@ let defaultTableOptions:TableOptions = {
   //TODO
 };
 
-abstract class BaseOperation
+interface Operation 
+{
+  action:action;
+  execute():Promise<QueryResult | CQLResponseError | EmptyResult>;
+}
+
+abstract class BaseOperation implements Operation
 {
   action:action;
   path:string;
@@ -126,8 +139,6 @@ abstract class BaseOperation
   public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
   {
     if(this.query === null) throw new Error("unable to execute CQL operation, query not built");
-    console.log(this.query.queryTxt);
-    console.log(this.query.params)
     return runDB(this.query);
   }
 
@@ -146,7 +157,6 @@ abstract class BaseOperation
       {
         this.documents.push(names[i]);
         let nameCtrl = names[i].match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-        console.log(names[i]);
         if(nameCtrl === null) throw new Error("Invalid document ID");
       }      
     }
@@ -162,7 +172,7 @@ abstract class BaseOperation
       params.push(this.documents[i]);
     }
     res = res.slice(0,-5);
-    return {queryTxt: res, params: params};
+    return {query: res, params: params};
   }
 
   protected buildTableName():string
@@ -176,10 +186,10 @@ abstract class BaseOperation
     return res;
   }
 
-  protected async createTable(tableOptions?:TableOptions):Promise<void>
+  public async createTable(tableOptions?:TableOptions):Promise<void>
   {
     let tableName:string = this.buildTableName();
-    let res = "CREATE TABLE " + tableName + " (";
+    let res = "CREATE TABLE IF NOT EXISTS " + tableName + " (";
     let primaryKey:string = "(";
     for(let i:number = 0; i<this.collections.length; i++)
     {
@@ -189,7 +199,7 @@ abstract class BaseOperation
     primaryKey = primaryKey.slice(0,-2) + ")";
     res = res + "content text, PRIMARY KEY " + primaryKey + ")";
     console.log(res);
-    await runDB({queryTxt:res, params:[]});
+    await runDB({query:res, params:[]});
     
     //Add tableOtions
     //TODO
@@ -229,14 +239,14 @@ class SaveOperation extends BaseOperation
     })
     keys = keys.slice(0,-2) + ")";
     placeholders = placeholders.slice(0,-2) + ")";
-    this.query = {queryTxt: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders, params: params};
+    this.query = {query: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders, params: params};
 
     if( this.options != undefined)
     {
-      this.query.queryTxt = this.query.queryTxt + " USING ";
-      if(this.options.ttl != undefined) this.query.queryTxt = this.query.queryTxt + " TTL " + this.options.ttl + " AND ";
+      this.query.query = this.query.query + " USING ";
+      if(this.options.ttl != undefined) this.query.query = this.query.query + " TTL " + this.options.ttl + " AND ";
       //Add other options
-      this.query.queryTxt = this.query.queryTxt.slice(0,-4);
+      this.query.query = this.query.query.slice(0,-4);
     }
   }
 
@@ -287,7 +297,7 @@ class GetOperation extends BaseOperation
     let tableName:string = super.buildTableName();
     let whereClause:Query = super.buildPrimaryKey();
     this.query = {
-      queryTxt: "SELECT JSON * FROM " + tableName + " WHERE " + whereClause.queryTxt ,
+      query: "SELECT JSON * FROM " + tableName + " WHERE " + whereClause.query ,
       params: whereClause.params
     };
     if(this.filter != undefined)
@@ -315,22 +325,100 @@ class RemoveOperation extends BaseOperation
     let tableName:string = super.buildTableName();
     let whereClause:Query = super.buildPrimaryKey();
     this.query = {
-      queryTxt: "DELETE FROM " + tableName + " WHERE " + whereClause.queryTxt ,
+      query: "DELETE FROM " + tableName + " WHERE " + whereClause.query ,
       params: whereClause.params 
     };
   }
 };
 
-/* class BatchOperation
+class BatchOperation implements Operation
 {
-  //TODO
-} */
+  action:action;
+  operations:BaseOperation[];
+  queries:Query[] | null;
 
+  options?:QueryOptions;
 
-async function runDB(query:Query):Promise<QueryResult | EmptyResult>
+  tableCreationFlag:boolean = false;
+  tableOptions?:TableOptions;
+
+  constructor(batch:BaseOperation[])
+  {
+    this.action = action.batch;
+    this.operations = batch;
+    for(let op of this.operations)
+    {
+      if(op.action === action.batch || op.action === action.get) throw new Error("Batch cannot contain batch or get operations");
+    }
+    this.queries = null;
+  }
+
+  public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
+  {
+    this.buildQueries();
+    if(this.queries === null) throw new Error("Error in batch, invalid query");
+    return runBatchDB(this.queries)
+    .catch(async (err:CQLResponseError) =>
+    {
+      if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+      {
+        this.tableCreationFlag = true;
+        return await this.createAllTables()
+        .then( async () => 
+        {
+          if(this.queries === null) throw new Error("Error in batch, invalid query");
+          return await runBatchDB(this.queries);
+        });
+      }
+      return err;
+    });
+  }
+
+  public push(operation:BaseOperation)
+  {
+    if(operation.action === action.batch || operation.action === action.get) throw new Error("Batch cannot contain batch or get operations");
+    this.operations.push(operation);
+  }
+
+  protected buildQueries():void
+  {
+    this.queries = [];
+    for(let op of this.operations)
+    {
+      if(op.query === null) throw new Error("Error in batch, a base query is not built");
+      this.queries.push(op.query);
+    }
+  }
+
+  protected async createAllTables():Promise<void>
+  {
+    for(let op of this.operations)
+    {
+      await op.createTable(this.tableOptions);
+    }
+  }
+} 
+
+async function runDB(query:Query, options?:QueryOptions):Promise<QueryResult | EmptyResult>
 {
+  console.log(query);
   let rs:any;
-  rs = await client.execute(query.queryTxt, query.params, {prepare: true});
+  if(options === undefined) options = defaultQueryOptions;
+  rs = await client.execute(query.query, query.params, options);
+  return processResult(rs);
+};
+
+async function runBatchDB(queries:Query[], options?:QueryOptions):Promise<QueryResult | EmptyResult>
+{
+  console.log(queries);
+  let rs:any;
+  if(options === undefined) options = defaultQueryOptions;
+  rs = await client.batch(queries, options);
+  return processResult(rs);
+}
+
+function processResult(rs:any):QueryResult | EmptyResult
+{
   const ans = rs.first();
   console.log(rs.info);
   if(ans == null)
@@ -344,7 +432,7 @@ async function runDB(query:Query):Promise<QueryResult | EmptyResult>
   }
   console.log("Result =",result);
   return result;
-};
+}
 
 async function createKeyspace(keyspaceName:string, options:KeyspaceReplicationOptions):Promise<void>
 {
@@ -353,27 +441,39 @@ async function createKeyspace(keyspaceName:string, options:KeyspaceReplicationOp
   let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
   res = res.split('"').join("'");
   console.log(res);
-  await runDB({queryTxt:res, params:[]});
+  await runDB({query:res, params:[]});
 };
 
 
-export default function createOperation(request:ServerBaseRequest):BaseOperation
+export default function createOperation(request:ServerBaseRequest):Operation
 {
   try
   {
     console.log(request.action);
-    if(request.path == undefined) throw new Error("missing field path in request");
-    request.path = request.path.toLowerCase();
+    if(request.path === undefined && request.action != action.batch) throw new Error("missing field path in request");
+    if(request.action !== action.batch) request.path = request.path.toLowerCase();
     let op:BaseOperation;
     switch(request.action)
     {
+      case action.batch:
+      {
+        if(request.operations === undefined) throw new Error("missing field operations in batch request");
+        let batch = new BatchOperation([]);
+        for(let req of request.operations)
+        {
+          let operation = createOperation(req);
+          if(!(operation instanceof BaseOperation)) throw new Error("Only base operations are allowed in a batch");
+          batch.push(operation);
+        }
+        return batch;
+      }
       case action.save:
       {
         if(request.object == undefined) throw new Error("missing field object in save request");
         op = new SaveOperation(request);
         return op;
       }
-      case "get":
+      case action.get:
       {
         op = new GetOperation(request);
         return op;
