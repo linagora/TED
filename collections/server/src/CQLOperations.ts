@@ -1,130 +1,21 @@
-import cassandra from "cassandra-driver";
+import * as myTypes from "./myTypes";
+import * as datastaxTools from "./DatastaxTools";
 import { table } from "console";
 import { kMaxLength } from "buffer";
 import { Serializer } from "v8";
 //import uuid from "uuid";
 
-const client = new cassandra.Client(
+
+abstract class BaseOperation implements myTypes.Operation
 {
-  contactPoints: ['127.0.0.1'],
-  localDataCenter: 'datacenter1'
-});
-
-const defaultKeyspaceOptions:KeyspaceReplicationOptions = {
-  class:"SimpleStrategy",
-  replication_factor:3
-};
-
-client.connect();
-let keyspace:string = "twake_collections";
-let initQuery = "USE " + keyspace;
-client.execute(initQuery)
-.catch( async (err:CQLResponseError) => 
-{
-  if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
-  {
-    return await createKeyspace(keyspace, defaultKeyspaceOptions).then( () => client.execute(initQuery));
-  }
-});
-
-enum action 
-{
-  save = "save",
-  get = "get",
-  remove = "remove",
-  configure = "configure",
-  batch = "batch"
-};
-
-type QueryOptions = cassandra.QueryOptions;
-
-type KeyspaceReplicationOptions = {
-  class:"SimpleStrategy" | "NetworkTopologyStrategy" | "OldNetworkTopologyStrategy";
-  replication_factor?:number;
-  datacentersRF?:JSON;
-};
-
-type SaveOptions = {
-  ttl?:number;
-};
-
-type Filter = {
-  //TODO
-};
-
-type Order = {
-  //TODO
-};
-
-type ServerBaseRequest = {
-  action: action;
-  path:string;
-  object?:StorageType;
-  options?:SaveOptions | any;
-  filter?:Filter;
-  order?:Order;
-  limit?:number;
-  pageToken?:string;
-  operations?:ServerBaseRequest[];
-};
-
-type CQLResponseError = {
-  name:string;
-  info:string;
-  message:string;
-  code:number;
-  query:string;
-};
-
-type Query = {
-  query:string;
-  params:string[];
-};
-
-const defaultQueryOptions:QueryOptions = {
-  keyspace:keyspace,
-  prepare:true,
-
-}
-
-type QueryResult = {
-  resultCount:number;
-  results:JSON[];
-};
-
-type EmptyResult = {
-  status:string;
-}
-
-type StorageType = {
-  [key:string]:string;
-  content:any;  
-};
-
-type TableOptions = {
- //TODO
-};
-
-let defaultTableOptions:TableOptions = {
-  //TODO
-};
-
-interface Operation 
-{
-  action:action;
-  execute():Promise<QueryResult | CQLResponseError | EmptyResult>;
-}
-
-abstract class BaseOperation implements Operation
-{
-  action:action;
+  action:myTypes.action;
   path:string;
   collections:string[];
   documents:string[];
-  query:Query | null;
+  query:myTypes.Query | null;
 
   
-  constructor(request:ServerBaseRequest)
+  constructor(request:myTypes.ServerBaseRequest)
   {
     this.action = request.action;
     this.path = request.path;
@@ -136,10 +27,10 @@ abstract class BaseOperation implements Operation
 
   protected abstract buildQuery():void;
 
-  public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
+  public async execute():Promise<myTypes.ServerAnswer>
   {
     if(this.query === null) throw new Error("unable to execute CQL operation, query not built");
-    return runDB(this.query);
+    return datastaxTools.runDB(this.query);
   }
 
   private processPath()
@@ -162,7 +53,7 @@ abstract class BaseOperation implements Operation
     }
   }
 
-  protected buildPrimaryKey():Query
+  protected buildPrimaryKey():myTypes.Query
   {
     let res = "";
     let params:string[] = [];
@@ -186,7 +77,7 @@ abstract class BaseOperation implements Operation
     return res;
   }
 
-  public async createTable(tableOptions?:TableOptions):Promise<void>
+  public async createTable(tableOptions?:myTypes.TableOptions):Promise<void>
   {
     let tableName:string = this.buildTableName();
     let res = "CREATE TABLE IF NOT EXISTS " + tableName + " (";
@@ -198,8 +89,7 @@ abstract class BaseOperation implements Operation
     }
     primaryKey = primaryKey.slice(0,-2) + ")";
     res = res + "content text, PRIMARY KEY " + primaryKey + ")";
-    console.log(res);
-    await runDB({query:res, params:[]});
+    await datastaxTools.runDB({query:res, params:[]});
     
     //Add tableOtions
     //TODO
@@ -208,13 +98,13 @@ abstract class BaseOperation implements Operation
 
 class SaveOperation extends BaseOperation
 {
-  object:StorageType;
-  options?:SaveOptions;
+  object:myTypes.EncObject;
+  options?:myTypes.SaveOptions;
 
   tableCreationFlag:boolean = false;
-  tableOptions?:TableOptions;
+  tableOptions?:myTypes.TableOptions;
 
-  constructor(request:ServerBaseRequest)
+  constructor(request:myTypes.ServerBaseRequest)
   {
     super(request);
     if(this.documents.length != this.collections.length) throw new Error("Invalid path length parity for a save operation");
@@ -250,10 +140,10 @@ class SaveOperation extends BaseOperation
     }
   }
 
-  public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
+  public async execute():Promise<myTypes.ServerAnswer>
   {
     return await super.execute()
-    .catch(async (err:CQLResponseError) =>
+    .catch(async (err:myTypes.CQLResponseError) =>
     {
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
@@ -261,7 +151,7 @@ class SaveOperation extends BaseOperation
         return await super.createTable(this.tableOptions)
         .then( () => super.execute());
       }
-      return err;
+      return {status:"error", error:err};
     });
   }
 
@@ -276,12 +166,12 @@ class SaveOperation extends BaseOperation
 
 class GetOperation extends BaseOperation
 {
-  filter?:Filter;
-  order?:Order;
+  filter?:myTypes.Filter;
+  order?:myTypes.Order;
   limit?:number;
   pageToken?:string;
 
-  constructor(request:ServerBaseRequest)
+  constructor(request:myTypes.ServerBaseRequest)
   {
     super(request);
     this.filter = request.filter;
@@ -295,7 +185,7 @@ class GetOperation extends BaseOperation
   protected buildQuery():void
   {
     let tableName:string = super.buildTableName();
-    let whereClause:Query = super.buildPrimaryKey();
+    let whereClause:myTypes.Query = super.buildPrimaryKey();
     this.query = {
       query: "SELECT JSON * FROM " + tableName + " WHERE " + whereClause.query ,
       params: whereClause.params
@@ -313,7 +203,7 @@ class GetOperation extends BaseOperation
 
 class RemoveOperation extends BaseOperation
 {
-  constructor(request:ServerBaseRequest)
+  constructor(request:myTypes.ServerBaseRequest)
   {
     super(request);
     if(this.documents.length != this.collections.length) throw new Error("Invalid path length parity for a remove operation");
@@ -323,7 +213,7 @@ class RemoveOperation extends BaseOperation
   protected buildQuery():void
   {
     let tableName:string = super.buildTableName();
-    let whereClause:Query = super.buildPrimaryKey();
+    let whereClause:myTypes.Query = super.buildPrimaryKey();
     this.query = {
       query: "DELETE FROM " + tableName + " WHERE " + whereClause.query ,
       params: whereClause.params 
@@ -331,34 +221,34 @@ class RemoveOperation extends BaseOperation
   }
 };
 
-class BatchOperation implements Operation
+class BatchOperation implements myTypes.Operation
 {
-  action:action;
+  action:myTypes.action;
   operations:BaseOperation[];
-  queries:Query[] | null;
+  queries:myTypes.Query[] | null;
 
-  options?:QueryOptions;
+  options?:myTypes.QueryOptions;
 
   tableCreationFlag:boolean = false;
-  tableOptions?:TableOptions;
+  tableOptions?:myTypes.TableOptions;
 
   constructor(batch:BaseOperation[])
   {
-    this.action = action.batch;
+    this.action = myTypes.action.batch;
     this.operations = batch;
     for(let op of this.operations)
     {
-      if(op.action === action.batch || op.action === action.get) throw new Error("Batch cannot contain batch or get operations");
+      if(op.action === myTypes.action.batch || op.action === myTypes.action.get) throw new Error("Batch cannot contain batch or get operations");
     }
     this.queries = null;
   }
 
-  public async execute():Promise<QueryResult | CQLResponseError | EmptyResult>
+  public async execute():Promise<myTypes.ServerAnswer>
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
-    return runBatchDB(this.queries)
-    .catch(async (err:CQLResponseError) =>
+    return datastaxTools.runBatchDB(this.queries)
+    .catch(async (err:myTypes.CQLResponseError) =>
     {
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
@@ -367,16 +257,16 @@ class BatchOperation implements Operation
         .then( async () => 
         {
           if(this.queries === null) throw new Error("Error in batch, invalid query");
-          return await runBatchDB(this.queries);
+          return await datastaxTools.runBatchDB(this.queries);
         });
       }
-      return err;
+      return {status: "error", error:err};
     });
   }
 
   public push(operation:BaseOperation)
   {
-    if(operation.action === action.batch || operation.action === action.get) throw new Error("Batch cannot contain batch or get operations");
+    if(operation.action === myTypes.action.batch || operation.action === myTypes.action.get) throw new Error("Batch cannot contain batch or get operations");
     this.operations.push(operation);
   }
 
@@ -399,63 +289,16 @@ class BatchOperation implements Operation
   }
 } 
 
-async function runDB(query:Query, options?:QueryOptions):Promise<QueryResult | EmptyResult>
-{
-  console.log(query);
-  let rs:any;
-  if(options === undefined) options = defaultQueryOptions;
-  rs = await client.execute(query.query, query.params, options);
-  return processResult(rs);
-};
-
-async function runBatchDB(queries:Query[], options?:QueryOptions):Promise<QueryResult | EmptyResult>
-{
-  console.log(queries);
-  let rs:any;
-  if(options === undefined) options = defaultQueryOptions;
-  rs = await client.batch(queries, options);
-  return processResult(rs);
-}
-
-function processResult(rs:any):QueryResult | EmptyResult
-{
-  const ans = rs.first();
-  console.log(rs.info);
-  if(ans == null)
-  {
-    return {status: "Query successful. No result to display"};
-  }
-  let result:QueryResult = {resultCount:rs.rowLength, results:[]};
-  for(let i:number = 0; i<result.resultCount; i++)
-  {
-    result.results.push(JSON.parse(rs.rows[i]['[json]']));
-  }
-  console.log("Result =",result);
-  return result;
-}
-
-async function createKeyspace(keyspaceName:string, options:KeyspaceReplicationOptions):Promise<void>
-{
-  let nameCtrl = keyspaceName.match(/^[a-zA-Z\_]*$/);
-  if(nameCtrl === null) throw new Error("Invalid keyspace name");
-  let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
-  res = res.split('"').join("'");
-  console.log(res);
-  await runDB({query:res, params:[]});
-};
-
-
-export default function createOperation(request:ServerBaseRequest):Operation
+export default function createOperation(request:myTypes.ServerBaseRequest):myTypes.Operation
 {
   try
   {
-    console.log(request.action);
-    if(request.path === undefined && request.action != action.batch) throw new Error("missing field path in request");
-    if(request.action !== action.batch) request.path = request.path.toLowerCase();
+    if(request.path === undefined && request.action != myTypes.action.batch) throw new Error("missing field path in request");
+    if(request.action !== myTypes.action.batch) request.path = request.path.toLowerCase();
     let op:BaseOperation;
     switch(request.action)
     {
-      case action.batch:
+      case myTypes.action.batch:
       {
         if(request.operations === undefined) throw new Error("missing field operations in batch request");
         let batch = new BatchOperation([]);
@@ -467,18 +310,18 @@ export default function createOperation(request:ServerBaseRequest):Operation
         }
         return batch;
       }
-      case action.save:
+      case myTypes.action.save:
       {
         if(request.object == undefined) throw new Error("missing field object in save request");
         op = new SaveOperation(request);
         return op;
       }
-      case action.get:
+      case myTypes.action.get:
       {
         op = new GetOperation(request);
         return op;
       }
-      case action.remove:
+      case myTypes.action.remove:
       {
         let op = new RemoveOperation(request);
         return op;

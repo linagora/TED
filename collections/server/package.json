@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "cassandra-driver": "^4.5.2",
+    "crypto": "^1.0.1",
     "esm": "^3.2.25",
+    "js-base64": "^2.6.2",
     "uuid": "^8.2.0"
   }
 }
