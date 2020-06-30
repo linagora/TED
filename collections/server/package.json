@@ -17,6 +17,7 @@
     "typescript": "^3.9.5"
   },
   "dependencies": {
+    "@types/uuid": "^8.0.0",
     "cassandra-driver": "^4.5.2",
     "crypto": "^1.0.1",
     "esm": "^3.2.25",

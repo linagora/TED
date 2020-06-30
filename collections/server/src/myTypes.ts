@@ -1,4 +1,5 @@
 import {QueryOptions as QO} from "cassandra-driver";
+import { Server } from "http";
 
 export type QueryOptions = QO;
 
@@ -8,7 +9,8 @@ export enum action
   get = "get",
   remove = "remove",
   configure = "configure",
-  batch = "batch"
+  batch = "batch",
+  log = "log",
 };
 
 export type KeyspaceReplicationOptions = {
@@ -32,7 +34,7 @@ export type Order = {
 export type ServerBaseRequest = {
   action: action;
   path:string;
-  object?:ClearObject | EncObject;
+  object?:ServerSideObject;
   options?:SaveOptions | any;
   filter?:Filter;
   order?:Order;
@@ -41,10 +43,20 @@ export type ServerBaseRequest = {
   operations?:ServerBaseRequest[];
 };
 
+export type InternalOperationDescription = {
+  action:action;
+  primaryKey:string[];
+  values:any[];
+  clearObject?:ServerSideObject;
+  encObject?:string;
+  operations?:InternalOperationDescription[];
+  options?:any;
+};
+
 export type ServerAnswer = {
-    status:string;
-    queryResults?:QueryResult;
-    error?:CQLResponseError|string;
+  status:string;
+  queryResults?:QueryResult;
+  error?:CQLResponseError|string;
 };
 
 export type CQLResponseError = {
@@ -62,33 +74,58 @@ export type Query = {
 
 export type QueryResult = {
   resultCount:number;
-  allResults:ClearObject[] | EncObject[];
+  allResultsClear?:ServerSideObject[];
+  allResultsEnc?:EncObject[];
 };
 
-export type ClearObject = {
-    [primaryKey:string]:string;
-    content:string; //clear content
-}
-
-export type EncObject = {
+export type ServerSideObject = {
   [key:string]:string;
-  content:string; //stringfy from a DBentry
+  content:string;
 };
 
 export type DBentry = {
-    content:string;
-    iv?:string;
-    auth?:string;
+  [key:string]:string; //key=collections, values = documents
+  object:string; //stringfy from an EncObject or objectUUID
+};
+
+export type EncObject = {
+  data:string;
+  iv:string;
+  auth:string;
+}
+
+export type OperationID = {
+  counter:number;
+  timestamp:number;
 }
 
 
+export type TableDefinition = {
+  name:string;
+  keys:string[];
+  types:string[];
+  primaryKey:string[];
+};
 
 export type TableOptions = {
- //TODO
-};
+  nameExtension?:string;
+  secondaryTable:boolean;
+  //TODO
+}
 
 export interface Operation 
 {
   action:action;
   execute():Promise<ServerAnswer>;
+}
+
+export type Log = {
+  action:action;
+  uuid:string;
+  object?:string; //encrypted object
+}
+
+export type LogEntry = {
+  [key:string]:string;
+  log:string //stringify from a Log
 }
