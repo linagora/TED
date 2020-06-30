@@ -31,10 +31,6 @@ const defaultKeyspaceOptions:myTypes.KeyspaceReplicationOptions =
     replication_factor:3
 };
 
-const defaultTableOptions:myTypes.TableOptions = {
-//TODO
-};
-
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
   console.log("Query =\n",query);
@@ -58,12 +54,13 @@ function processResult(rs:any):myTypes.ServerAnswer
   const ans = rs.first();
   if(ans == null)
   {
-    return {status: "success", queryResults:{resultCount:0, allResults:[]}};
+    return {status: "success", queryResults:{resultCount:0, allResultsEnc:[]}};
   }
-  let queryResults:myTypes.QueryResult = {resultCount:rs.rowLength, allResults:[]};
+  let queryResults:myTypes.QueryResult = {resultCount:rs.rowLength};
+  queryResults.allResultsEnc = [];
   for(let i:number = 0; i<queryResults.resultCount; i++)
   {
-    queryResults.allResults.push(JSON.parse(rs.rows[i]['[json]']));
+    queryResults.allResultsEnc.push(JSON.parse(rs.rows[i]['[json]']));
   }
   console.log("Result =\n",queryResults);
   return {status: "success", queryResults:queryResults};
