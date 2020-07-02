@@ -1,6 +1,7 @@
 import * as myTypes from "./myTypes";
 import crypto, { Cipher, KeyObject } from "crypto";
 import { SaveOperation, GetOperation } from "./BaseOperations";
+import { clear } from "console";
 
 /* export function encryptRequest(request:myTypes.ServerBaseRequest, key:crypto.KeyObject):void
 {
@@ -28,10 +29,15 @@ export function decryptResult(ans:myTypes.ServerAnswer, key:crypto.KeyObject):vo
 {
   if(ans.queryResults !== undefined && ans.queryResults.allResultsEnc !== undefined)
   {
-    ans.queryResults.allResultsClear = [];
-    for(let i:number = 0; i<ans.queryResults.resultCount; i++)
+    ans.queryResults.allResultsClear = [] as myTypes.ServerSideObject[];
+    for(let i:number = 0; i<ans.queryResults.allResultsEnc.length; i++)
     {
-      ans.queryResults.allResultsClear.push(decryptData(ans.queryResults.allResultsEnc[i], key));
+      let encObject:myTypes.EncObject = JSON.parse(ans.queryResults.allResultsEnc[i].object);
+      let clearData:myTypes.ServerSideObject = decryptData(encObject, key);
+      let objectIDs:myTypes.ServerSideObject = ans.queryResults.allResultsEnc[i];
+      objectIDs.object = undefined;
+
+      ans.queryResults.allResultsClear.push({...objectIDs, ...clearData});
     }
     ans.queryResults.allResultsEnc = undefined;
   }

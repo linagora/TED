@@ -10,7 +10,7 @@ import { type } from "os";
 //=================================================
 //                TEST CODE
 
-const key:crypto.KeyObject = crypto.createSecretKey(crypto.createHash('sha256').update('test').digest());
+export const key:crypto.KeyObject = crypto.createSecretKey(crypto.createHash('sha256').update('test').digest());
 
 async function getHTTPBody(req:any):Promise<myTypes.ServerBaseRequest>
 {
@@ -42,11 +42,11 @@ http.createServer(async function(req: any, res: any)
   let body_str:myTypes.ServerBaseRequest = await getHTTPBody(req);
   try
   {
-    console.log(body_str);
+    console.log("Incoming request =\n", body_str);
     let opDescriptor = utils.getInternalOperationDescription(body_str);
-    console.log("op", opDescriptor);
+    console.log("opDescriptor =\n", opDescriptor);
     myCrypto.encryptOperation(opDescriptor, key);
-    let op = utils.createOperation(opDescriptor);
+    let op = await utils.createOperation(opDescriptor);
     if(op instanceof BaseOperation)
     {
       let opLog = new OperationLog.OperationLog(op);
@@ -61,7 +61,7 @@ http.createServer(async function(req: any, res: any)
     })
     .catch((err:myTypes.ServerAnswer) => 
     {
-      console.log("catch1", err);
+      console.log("catch1 \n", err);
       res.write(JSON.stringify(err));
       res.end();
     });

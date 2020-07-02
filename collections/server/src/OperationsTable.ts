@@ -3,22 +3,19 @@ import * as CQL from "./BaseOperations";
 
 export class OperationLog extends CQL.BaseOperation
 {
-    operation:CQL.BaseOperation;
     op_id:myTypes.OperationID | null;
     entry:myTypes.LogEntry;
 
-    tableOptions?:myTypes.TableOptions;
-
-    constructor(operation:CQL.BaseOperation)
+    constructor(operation:myTypes.InternalOperationDescription)
     {
         super({
             action: myTypes.action.log,
             collections: operation.collections,
-            documents: operation.documents
+            documents: operation.documents,
+            tableOptions:{secondaryTable:false}
         });
-        this.operation = operation;
         this.op_id = null;
-        this.entry = {log: JSON.stringify(OperationLog.operationToLog(this.operation))};
+        this.entry = {log: JSON.stringify(OperationLog.operationToLog(operation))};
         this.buildEntry();
         this.buildQuery();
     }
@@ -68,7 +65,7 @@ export class OperationLog extends CQL.BaseOperation
         }
     }
 
-    protected static operationToLog(operation:CQL.BaseOperation):myTypes.Log
+    protected static operationToLog(operation:myTypes.InternalOperationDescription):myTypes.Log
     {
         if( operation instanceof CQL.SaveOperation)
         {

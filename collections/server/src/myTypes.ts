@@ -13,6 +13,18 @@ export enum action
   log = "log",
 };
 
+export enum Operator
+{
+  eq = "=",
+  diff = "!=",
+  gt = ">",
+  geq = ">=",
+  lt = '<',
+  leq = '<=',
+  in = "IN",
+  notin = "NOT IN"
+}
+
 export type KeyspaceReplicationOptions = {
   class:"SimpleStrategy" | "NetworkTopologyStrategy" | "OldNetworkTopologyStrategy";
   replication_factor?:number;
@@ -41,16 +53,19 @@ export type ServerBaseRequest = {
   limit?:number;
   pageToken?:string;
   operations?:ServerBaseRequest[];
+  where?:WhereClause;
 };
 
 export type InternalOperationDescription = {
   action:action;
-  primaryKey:string[];
-  values:any[];
+  collections:string[];
+  documents:string[];
   clearObject?:ServerSideObject;
   encObject?:string;
   operations?:InternalOperationDescription[];
   options?:any;
+  tableOptions:TableOptions;
+  secondaryInfos?:WhereClause;
 };
 
 export type ServerAnswer = {
@@ -75,17 +90,16 @@ export type Query = {
 export type QueryResult = {
   resultCount:number;
   allResultsClear?:ServerSideObject[];
-  allResultsEnc?:EncObject[];
+  allResultsEnc?:DBentry[];
 };
 
 export type ServerSideObject = {
-  [key:string]:string;
-  content:string;
+  [key:string]:any;
+  //content:string;
 };
 
 export type DBentry = {
   [key:string]:string; //key=collections, values = documents
-  object:string; //stringfy from an EncObject or objectUUID
 };
 
 export type EncObject = {
@@ -128,4 +142,15 @@ export type Log = {
 export type LogEntry = {
   [key:string]:string;
   log:string //stringify from a Log
+}
+
+export type SecondaryInfos = {
+  secondaryKey:string;
+  secondaryValue?:any;
+}
+
+export type WhereClause = {
+  operator:Operator;
+  field:string;
+  value:any;
 }
