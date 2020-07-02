@@ -54,13 +54,24 @@ function processResult(rs:any):myTypes.ServerAnswer
   const ans = rs.first();
   if(ans == null)
   {
-    return {status: "success", queryResults:{resultCount:0, allResultsEnc:[]}};
+    return {status: "success", queryResults:{resultCount:0, allResultsEnc:[], allResultsClear:[]}};
   }
   let queryResults:myTypes.QueryResult = {resultCount:rs.rowLength};
   queryResults.allResultsEnc = [];
+  queryResults.allResultsClear = [];
   for(let i:number = 0; i<queryResults.resultCount; i++)
   {
-    queryResults.allResultsEnc.push(JSON.parse(rs.rows[i]['[json]']));
+    let object = JSON.parse(rs.rows[i]['[json]']);
+    console.log("raw result =\n", object);
+    try
+    {
+      JSON.parse(object["object"]);
+      queryResults.allResultsEnc.push(object);
+    }
+    catch
+    {
+      queryResults.allResultsClear.push(object);
+    }
   }
   console.log("Result =\n",queryResults);
   return {status: "success", queryResults:queryResults};

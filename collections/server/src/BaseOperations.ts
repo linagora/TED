@@ -1,8 +1,7 @@
 import * as myTypes from "./myTypes";
 import * as datastaxTools from "./DatastaxTools";
+import { TStoCQLtypes } from "./SecondaryIndexOperations";
 import { table } from "console";
-import { kMaxLength } from "buffer";
-import { Serializer } from "v8";
 //import uuid from "uuid";
 
 
@@ -13,12 +12,17 @@ export abstract class BaseOperation implements myTypes.Operation
   documents:string[];
   query:myTypes.Query | null;
 
+  tableOptions:myTypes.TableOptions;
+  secondaryInfos?:myTypes.WhereClause
+
   
   constructor(request:myTypes.InternalOperationDescription)
   {
     this.action = request.action;
     this.collections = request.collections;
     this.documents = request.documents;
+    this.tableOptions = request.tableOptions;
+    this.secondaryInfos = request.secondaryInfos;
     this.query = null;
   }
 
@@ -39,7 +43,12 @@ export abstract class BaseOperation implements myTypes.Operation
       res = res + this.collections[i] + " = ? AND ";
       params.push(this.documents[i]);
     }
-    res = res.slice(0,-5);
+    if(this.secondaryInfos !== undefined)
+    {
+      res = res + this.secondaryInfos.field + " " + this.secondaryInfos.operator.toString() + " ?";
+      params.push(this.secondaryInfos.value);
+    }
+    else res = res.slice(0,-5);
     return {query: res, params: params};
   }
 
@@ -51,7 +60,12 @@ export abstract class BaseOperation implements myTypes.Operation
       res = res + this.collections[i] + "_";
     }
     res = res.slice(0,-1);
-    return res;
+    if(this.tableOptions.secondaryTable === true)
+    {
+      if(this.secondaryInfos === undefined) throw new Error("Operation is set to operate on a secondary table but no infos given");
+      res = res + "__index_" + this.secondaryInfos.field;
+    }
+    return res
   }
 
   public static async createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
@@ -81,13 +95,13 @@ export class SaveOperation extends BaseOperation
   options?:myTypes.SaveOptions;
 
   tableCreationFlag:boolean = false;
-  tableOptions?:myTypes.TableOptions;
 
   constructor(request:myTypes.InternalOperationDescription)
   {
     super(request);
+    console.log("New save operation =\n", request);
     if(this.documents.length != this.collections.length) throw new Error("Invalid path length parity for a save operation");
-    if(request.encObject === undefined) throw new Error("Missing field object for a save operation")
+    if(request.encObject === undefined) throw new Error("Missing field object for a save operation");
     this.object = request.encObject;
     this.options = request.options;
     this.buildQuery();
@@ -139,8 +153,8 @@ export class SaveOperation extends BaseOperation
   {
     let tableDefinition:myTypes.TableDefinition = {
       name: this.buildTableName(),
-      keys: ["object"],
-      types: ["text"],
+      keys: [],
+      types: [],
       primaryKey: []
     };
     for(let i:number = 0; i<this.documents.length; i++)
@@ -149,16 +163,47 @@ export class SaveOperation extends BaseOperation
       tableDefinition.primaryKey.push(this.collections[i]);
       tableDefinition.types.push("uuid");
     }
+    if(this.tableOptions.secondaryTable === true)
+    {
+      if(this.secondaryInfos === undefined) throw new Error("Operation is set to operate on a secondary table but no infos given");
+      if(this.secondaryInfos.value === undefined) throw new Error("Missing value to know secondary index data type");
+      if(this.secondaryInfos.operator !== myTypes.Operator.eq) throw new Error("Incompatible operator for a save operation");
+
+      tableDefinition.keys = tableDefinition.keys.slice(0,-1);
+      tableDefinition.types = tableDefinition.types.slice(0,-1);
+      tableDefinition.primaryKey = tableDefinition.primaryKey.slice(0,-1);
+      tableDefinition.keys.push(this.secondaryInfos.field);
+      let columnType = TStoCQLtypes.get(typeof(this.secondaryInfos.value));
+      if(columnType === undefined) throw new Error("Unsupported data type for a secondary index")
+      tableDefinition.types.push(columnType);
+      tableDefinition.primaryKey.push(this.secondaryInfos.field);
+      tableDefinition.keys.push(this.collections.slice(-1)[0]);
+      tableDefinition.primaryKey.push(this.collections.slice(-1)[0]);
+      tableDefinition.types.push("uuid");
+    }
+    else
+    {
+      tableDefinition.keys.push("object");
+      tableDefinition.types.push("text");
+    }
     return await BaseOperation.createTable(tableDefinition);
   }
 
   protected buildEntry():myTypes.DBentry
   {
-    let entry:myTypes.DBentry = {object: this.object};
-    for(let i:number = 0; i<this.documents.length; i++)
+    let entry:myTypes.DBentry = {};
+    let offset:number = this.tableOptions.secondaryTable ? 1 : 0;
+    for(let i:number = 0; i<this.documents.length - offset; i++)
     {
       entry[this.collections[i]] = this.documents[i];
     }
+    if(this.tableOptions.secondaryTable === true)
+    {
+      if(this.secondaryInfos === undefined) throw new Error("Operation is set to operate on a secondary table but no infos given");
+      entry[this.secondaryInfos.field] = this.secondaryInfos.value;
+      entry[this.collections.slice(-1)[0]] = this.object;
+    }
+    else entry["object"] = this.object;
     return entry;
   }
 };
@@ -200,7 +245,7 @@ export class RemoveOperation extends BaseOperation
   constructor(request:myTypes.InternalOperationDescription)
   {
     super(request);
-    if(this.documents.length != this.collections.length) throw new Error("Invalid path length parity for a remove operation");
+    if(this.documents.length !== this.collections.length && !this.tableOptions.secondaryTable) throw new Error("Invalid path length parity for a remove operation");
     this.buildQuery();
   }
 
