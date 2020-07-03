@@ -1,8 +1,12 @@
-import * as CQL from "../BaseTools/BaseOperations";
 import * as myTypes from "../BaseTools/myTypes";
 import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
 import getRoutine from "./GetRoutine";
+import * as OperationLog from "./../BaseTools/OperationsTable";
+import { key } from "./../index";
+import * as myCrypto from "./../BaseTools/CryptographicTools";
+
+
 
 export function processPath(path:string):{documents:string[], collections:string[]}
 {
@@ -36,18 +40,6 @@ export async function createOperation(opDescriptor:myTypes.InternalOperationDesc
         if((opDescriptor.collections === [] || opDescriptor.documents === []) && opDescriptor.action !== myTypes.action.batch) throw new Error("missing field path in request");
         switch(opDescriptor.action)
         {
-            case myTypes.action.batch:
-            {
-                if(opDescriptor.operations === undefined) throw new Error("missing field operations in batch request");
-                let batch = new CQL.BatchOperation([]);
-                for(let req of opDescriptor.operations)
-                {
-                    let operation = createOperation(req);
-                    if(!(operation instanceof CQL.BaseOperation)) throw new Error("Only base operations are allowed in a batch");
-                    batch.push(operation);
-                }
-                return batch;
-            }
             case myTypes.action.save:
             {
                 if(opDescriptor.encObject == undefined) throw new Error("Encrypted object not created in save request");
@@ -96,4 +88,58 @@ export function getInternalOperationDescription(request:myTypes.ServerBaseReques
         }
     }
     return opDescriptor;
+}
+
+export default async function handleRequest(request:myTypes.ServerBaseRequest, ):Promise<myTypes.ServerAnswer>
+{
+    let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request);
+    myCrypto.encryptOperation(opDescriptor, key);
+    switch(opDescriptor.action)
+    {
+        case myTypes.action.save:
+        case myTypes.action.remove:
+        {
+            let opLog = new OperationLog.OperationLog(opDescriptor);
+            await opLog.execute();
+            runWriteOperation(opDescriptor);
+            return {status: "Success"};
+        }
+        case myTypes.action.get:
+        {
+            let res = await runReadOperation(opDescriptor);
+            myCrypto.decryptResult(res, key);
+            return res;
+        }
+        default:
+        {
+            throw new Error("Unauthorized operation");
+        }
+    }    
+}
+
+async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+{
+    switch(opDescriptor.action)
+    {
+        case myTypes.action.save:
+        {
+            (await saveRoutine(opDescriptor)).execute();
+            break;
+        }
+        case myTypes.action.remove:
+        {
+            (await removeRoutine(opDescriptor)).execute();
+            break;
+        }
+        default:
+        {
+            throw new Error("This is not an authorized wirte operation");
+        }
+    }
+}
+
+async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.ServerAnswer>
+{
+    if(opDescriptor.action !== myTypes.action.get) throw new Error("This is not an authorized read operation");
+    return (await getRoutine(opDescriptor)).execute()
 }

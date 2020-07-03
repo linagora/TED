@@ -57,7 +57,6 @@ export function encryptOperation(operation:myTypes.InternalOperationDescription,
 
 function encryptData(data:myTypes.ServerSideObject, key:KeyObject):myTypes.EncObject
 {
-  console.log(data);
   let iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   let encData:string = cipher.update(JSON.stringify(data), 'utf8', 'hex');

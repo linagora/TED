@@ -15,7 +15,7 @@ export class OperationLog extends CQL.BaseOperation
             tableOptions:{secondaryTable:false}
         });
         this.op_id = null;
-        this.entry = {log: JSON.stringify(operation)};
+        this.entry = {log: this.createLog(operation)};
         this.buildEntry();
         this.buildQuery();
     }
@@ -63,6 +63,13 @@ export class OperationLog extends CQL.BaseOperation
         {
           this.entry[this.collections[i]] = this.documents[i];
         }
+    }
+
+    protected createLog(operation:myTypes.InternalOperationDescription):string
+    {
+      let copy:myTypes.InternalOperationDescription = {...operation};
+      delete copy.clearObject;
+      return JSON.stringify(copy);
     }
 
     public async createTable():Promise<void>

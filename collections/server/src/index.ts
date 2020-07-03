@@ -1,9 +1,7 @@
 import * as http from "http";
-import * as utils from "./MacroRoutines/RequestHandling";
+import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
-import * as OperationLog from "./BaseTools/OperationsTable"
 import crypto from "crypto";
-import * as myCrypto from "./BaseTools/CryptographicTools";
 
 //=================================================
 //                TEST CODE
@@ -41,25 +39,8 @@ http.createServer(async function(req: any, res: any)
   try
   {
     console.log("Incoming request =\n", body_str);
-    let opDescriptor = utils.getInternalOperationDescription(body_str);
-    console.log("opDescriptor =\n", opDescriptor);
-    myCrypto.encryptOperation(opDescriptor, key);
-    
-    if(opDescriptor.action !== myTypes.action.batch)
-    {
-      let opLogWrite = new OperationLog.OperationLog({
-        action: opDescriptor.action,
-        collections: opDescriptor.collections,
-        documents: opDescriptor.documents,
-        tableOptions: {secondaryTable: false},
-        encObject: opDescriptor.encObject
-      });
-      opLogWrite.execute();
-    }
-    let op = await utils.createOperation(opDescriptor);
-    let result:myTypes.ServerAnswer = await op.execute();
-    myCrypto.decryptResult(result, key);
-    res.write(JSON.stringify(result));
+    let answer = await handleRequest(body_str);
+    res.write(JSON.stringify(answer));
     res.end();
   }
   catch(err)
