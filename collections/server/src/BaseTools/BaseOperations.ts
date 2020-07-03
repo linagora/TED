@@ -1,6 +1,6 @@
 import * as myTypes from "./myTypes";
 import * as datastaxTools from "./DatastaxTools";
-import { TStoCQLtypes } from "./SecondaryIndexOperations";
+import { TStoCQLtypes } from "./SecondaryOperations";
 import { table } from "console";
 //import uuid from "uuid";
 
@@ -327,4 +327,5 @@ export class BatchOperation implements myTypes.Operation
     }
   }
 } 
+
 

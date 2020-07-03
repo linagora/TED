@@ -1,6 +1,6 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
-import {key} from "./index";
+import {key} from "../index";
 import { createHash } from "crypto";
 import { decryptResult } from "./CryptographicTools";
 
@@ -39,7 +39,7 @@ export function getRemoveOperationSecondaryIndex(operation:myTypes.InternalOpera
 
 export function getGetOperationSecondaryIndex(operation:myTypes.InternalOperationDescription, where?:myTypes.WhereClause):CQL.GetOperation
 {
-    if(operation.secondaryInfos === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
+    if(operation.secondaryInfos === undefined && where === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
     let op = new CQL.GetOperation({
         action: myTypes.action.get,
         collections: operation.collections,
@@ -50,14 +50,14 @@ export function getGetOperationSecondaryIndex(operation:myTypes.InternalOperatio
     return op;
 }
 
-function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryKey:string, operator:myTypes.Operator = myTypes.Operator.eq):myTypes.WhereClause
+export function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryKey:string, operator:myTypes.Operator = myTypes.Operator.eq):myTypes.WhereClause
 {
     if(object[secondaryKey] === undefined) throw new Error("Secondary key doesn't exist in object");
     if(typeof(object[secondaryKey]) === "string")
     {
         return {
             field:secondaryKey,
-            value: createHash("sha256").update(object[secondaryKey]).digest('base64'),
+            value: createHash("sha256").update(object[secondaryKey] as string).digest('base64'),
             operator: operator
         }
     }
@@ -70,6 +70,7 @@ function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryKey:stri
 
 export function removePreviousValue(opDescriptor:myTypes.InternalOperationDescription, where:myTypes.WhereClause):CQL.RemoveOperation
 {
+    if( opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Need the object ID to remove its previuous value");
     let removeOp = new CQL.RemoveOperation({
         action: myTypes.action.remove,
         collections: opDescriptor.collections,
@@ -78,4 +79,18 @@ export function removePreviousValue(opDescriptor:myTypes.InternalOperationDescri
         secondaryInfos: where
     })
     return removeOp;
+}
+
+export async function getPreviousValue(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.EncObject>
+{
+    if( opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Need the object ID to check its previuous value");
+    let getter:CQL.GetOperation = new CQL.GetOperation({
+        action: myTypes.action.get,
+        collections: opDescriptor.collections,
+        documents: opDescriptor.documents,
+        tableOptions: {secondaryTable: false}
+    });
+    let DBanswer = await getter.execute();
+    if(DBanswer.queryResults === undefined || DBanswer.queryResults.allResultsEnc === undefined || DBanswer.queryResults.allResultsEnc.length === 0) throw new Error("Unable to find a previous value");
+    return JSON.parse(DBanswer.queryResults.allResultsEnc[0].object);
 }

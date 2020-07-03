@@ -1,11 +1,9 @@
 import * as http from "http";
-import * as utils from "./RequestHandling";
-import { BaseOperation, SaveOperation } from "./BaseOperations";
-import * as myTypes from "./myTypes";
-import * as OperationLog from "./OperationsTable"
+import * as utils from "./MacroRoutines/RequestHandling";
+import * as myTypes from "./BaseTools/myTypes";
+import * as OperationLog from "./BaseTools/OperationsTable"
 import crypto from "crypto";
-import * as myCrypto from "./CryptographicTools";
-import { type } from "os";
+import * as myCrypto from "./BaseTools/CryptographicTools";
 
 //=================================================
 //                TEST CODE
@@ -46,25 +44,23 @@ http.createServer(async function(req: any, res: any)
     let opDescriptor = utils.getInternalOperationDescription(body_str);
     console.log("opDescriptor =\n", opDescriptor);
     myCrypto.encryptOperation(opDescriptor, key);
-    let op = await utils.createOperation(opDescriptor);
-    if(op instanceof BaseOperation)
+    
+    if(opDescriptor.action !== myTypes.action.batch)
     {
-      let opLog = new OperationLog.OperationLog(op);
-      opLog.execute();
+      let opLogWrite = new OperationLog.OperationLog({
+        action: opDescriptor.action,
+        collections: opDescriptor.collections,
+        documents: opDescriptor.documents,
+        tableOptions: {secondaryTable: false},
+        encObject: opDescriptor.encObject
+      });
+      opLogWrite.execute();
     }
-    op.execute()
-    .then( (result:myTypes.ServerAnswer) => 
-    {
-      myCrypto.decryptResult(result, key);
-      res.write(JSON.stringify(result));
-      res.end();
-    })
-    .catch((err:myTypes.ServerAnswer) => 
-    {
-      console.log("catch1 \n", err);
-      res.write(JSON.stringify(err));
-      res.end();
-    });
+    let op = await utils.createOperation(opDescriptor);
+    let result:myTypes.ServerAnswer = await op.execute();
+    myCrypto.decryptResult(result, key);
+    res.write(JSON.stringify(result));
+    res.end();
   }
   catch(err)
   {
@@ -72,8 +68,6 @@ http.createServer(async function(req: any, res: any)
     res.write('{"status":"' + err.toString() + '"}');
     res.end();
   }
-  
-
 }).listen(8080);
 
 console.log("This is a highway to hell")
