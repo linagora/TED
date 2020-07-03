@@ -133,11 +133,7 @@ export interface Operation
   execute():Promise<ServerAnswer>;
 }
 
-export type Log = {
-  action:action;
-  uuid:string;
-  object?:string; //encrypted object
-}
+export type Log = InternalOperationDescription;
 
 export type LogEntry = {
   [key:string]:string;

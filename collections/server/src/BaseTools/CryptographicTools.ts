@@ -35,9 +35,9 @@ export function decryptResult(ans:myTypes.ServerAnswer, key:crypto.KeyObject):vo
       let encObject:myTypes.EncObject = JSON.parse(ans.queryResults.allResultsEnc[i].object);
       let clearData:myTypes.ServerSideObject = decryptData(encObject, key);
       let objectIDs:myTypes.ServerSideObject = ans.queryResults.allResultsEnc[i];
-      objectIDs.object = undefined;
+      objectIDs.object = clearData;
 
-      ans.queryResults.allResultsClear.push({...objectIDs, ...clearData});
+      ans.queryResults.allResultsClear.push(objectIDs);
     }
     ans.queryResults.allResultsEnc = undefined;
   }
@@ -66,7 +66,7 @@ function encryptData(data:myTypes.ServerSideObject, key:KeyObject):myTypes.EncOb
   return encObject;
 }
 
-function decryptData(encObject:myTypes.EncObject, key:KeyObject):myTypes.ServerSideObject
+export function decryptData(encObject:myTypes.EncObject, key:KeyObject):myTypes.ServerSideObject
 {
     if(encObject.iv === undefined) throw new Error("Unable to decrypt data, missing iv");
     if(encObject.auth === undefined) throw new Error("Unable to decrypt data, missing auth");
