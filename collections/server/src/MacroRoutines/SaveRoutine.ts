@@ -26,7 +26,6 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     {
         Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
         {
-            console.log(value, "is of type : ", typeof(value));
             if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined)
             {
                 opArray.push(secondary.getSaveOperationSecondaryIndex(opDescriptor, key));

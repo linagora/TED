@@ -99,7 +99,6 @@ export class SaveOperation extends BaseOperation
   constructor(request:myTypes.InternalOperationDescription)
   {
     super(request);
-    console.log("New save operation =\n", request);
     if(this.documents.length != this.collections.length) throw new Error("Invalid path length parity for a save operation");
     if(request.encObject === undefined) throw new Error("Missing field object for a save operation");
     this.object = request.encObject;

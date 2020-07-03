@@ -13,7 +13,6 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     if(opDescriptor.secondaryInfos === undefined) return new CQL.GetOperation(opDescriptor);
 
     let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
-    console.log(matchingIDs);
     if(matchingIDs.length === 0) throw EmptyResultError;
     let op = buildGetOperation(opDescriptor, matchingIDs);
     console.log("final op =\n", op);

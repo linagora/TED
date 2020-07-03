@@ -94,7 +94,7 @@ export type QueryResult = {
 };
 
 export type ServerSideObject = {
-  [key:string]:any;
+  [key:string]:string|ServerSideObject;
   //content:string;
 };
 
