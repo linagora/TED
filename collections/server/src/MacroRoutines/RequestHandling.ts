@@ -5,7 +5,7 @@ import getRoutine from "./GetRoutine";
 import * as OperationLog from "./../BaseTools/OperationsTable";
 import { key } from "./../index";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
-import { pushOperation } from "../BaseTools/RedisTools";
+import { pushPending } from "../BaseTools/RedisTools";
 import { SaveTaskStore } from "./../BaseTools/TaskStore";
 import { BatchOperation } from "../BaseTools/BaseOperations";
 import { v1 as uuidv1 } from "uuid";
@@ -118,7 +118,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, )
         {
             let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)]);
             await opWrite.execute();
-            await pushOperation(request.path);
+            await pushPending(request.path);
             return {status: "Success"};
         }
         case myTypes.action.get:

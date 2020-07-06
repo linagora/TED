@@ -1,5 +1,5 @@
 import * as myTypes from "../BaseTools/myTypes";
-import { pushOperation, popOperation } from "../BaseTools/RedisTools";
+import { peekPending, removePending } from "../BaseTools/RedisTools";
 import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
 import { processPath, runWriteOperation } from "./RequestHandling";
 
@@ -43,8 +43,8 @@ async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
 
 async function runProjectionTask():Promise<void>
 {
-    let path = await popOperation();
-    if(path === null) 
+    let path = await peekPending();
+    if(path === undefined) 
     {
         console.log("No pending operation");
         return;
@@ -57,11 +57,11 @@ async function runProjectionTask():Promise<void>
         {
             await runPendingOperation(op);
         }
+        await removePending(path);
     }
     catch(err)
     {
         console.log("failed to run operation : " + err)
-        pushOperation(path)
     }
 }
 
