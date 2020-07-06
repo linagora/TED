@@ -2,23 +2,30 @@ import cassandra from "cassandra-driver";
 import * as myTypes from "./myTypes";
 import { Server } from "http";
 
+let keyspace:string = "twake_collections";
+
 const client = new cassandra.Client(
 {
     contactPoints: ['127.0.0.1'],
-    localDataCenter: 'datacenter1'
+    localDataCenter: 'datacenter1',
+    keyspace: keyspace,
+    policies: {
+      retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
+    },
+    queryOptions: {
+      isIdempotent: true
+    }
 });
   
-client.connect();
-let keyspace:string = "twake_collections";
-let initQuery = "USE " + keyspace;
-client.execute(initQuery)
+client.connect()
 .catch( async (err:myTypes.CQLResponseError) => 
 {
     if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
     {
-    return await createKeyspace(keyspace, defaultKeyspaceOptions).then( () => client.execute(initQuery));
+    return await createKeyspace(keyspace, defaultKeyspaceOptions);
     }
-});
+})
+.then( () => client.connect());
 
 const defaultQueryOptions:myTypes.QueryOptions = {
     keyspace:keyspace,
@@ -82,5 +89,10 @@ export async function createKeyspace(keyspaceName:string, options:myTypes.Keyspa
   if(nameCtrl === null) throw new Error("Invalid keyspace name");
   let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
   res = res.split('"').join("'");
-  await runDB({query:res, params:[]});
+  let clientTemp = new cassandra.Client({
+    contactPoints: ['127.0.0.1'],
+    localDataCenter: 'datacenter1',
+  });
+  console.log(res);
+  await clientTemp.execute(res);
 };

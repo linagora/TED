@@ -2,6 +2,7 @@ import * as http from "http";
 import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
 import crypto from "crypto";
+import { RedisLoop } from "./MacroRoutines/StoredTaskHandling";
 
 //=================================================
 //                TEST CODE
@@ -51,4 +52,6 @@ http.createServer(async function(req: any, res: any)
   }
 }).listen(8080);
 
-console.log("This is a highway to hell")
+console.log("This is a highway to hell");
+
+RedisLoop();

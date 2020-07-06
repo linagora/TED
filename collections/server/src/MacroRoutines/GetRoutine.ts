@@ -38,6 +38,7 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
 {
     let op = new CQL.GetOperation({
         action: myTypes.action.get,
+        opID: opDescriptor.opID,
         documents: opDescriptor.documents,
         collections: opDescriptor.collections,
         tableOptions: {secondaryTable: false},

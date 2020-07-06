@@ -7,7 +7,8 @@ import * as myCrypto from "./../BaseTools/CryptographicTools";
 
 export default async function saveRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<CQL.BatchOperation>
 {
-    if(opDescriptor.clearObject === undefined) throw new Error("missing object in save operation");
+    if(opDescriptor.clearObject === undefined && opDescriptor.encObject === undefined) throw new Error("missing object in save operation");
+    if(opDescriptor.clearObject === undefined) opDescriptor.clearObject = myCrypto.decryptData(JSON.parse(opDescriptor.encObject as string), key);
     let opArray:CQL.BaseOperation[] = [];
     try
     {

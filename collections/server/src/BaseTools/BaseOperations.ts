@@ -1,7 +1,7 @@
 import * as myTypes from "./myTypes";
 import * as datastaxTools from "./DatastaxTools";
 import { TStoCQLtypes } from "./SecondaryOperations";
-import { table } from "console";
+import { resolve } from "path";
 //import uuid from "uuid";
 
 
@@ -10,10 +10,12 @@ export abstract class BaseOperation implements myTypes.Operation
   action:myTypes.action;
   collections:string[];
   documents:string[];
+  opID:string;
   query:myTypes.Query | null;
 
   tableOptions:myTypes.TableOptions;
-  secondaryInfos?:myTypes.WhereClause
+  secondaryInfos?:myTypes.WhereClause;
+  canCreateTable:boolean;
 
   
   constructor(request:myTypes.InternalOperationDescription)
@@ -23,6 +25,8 @@ export abstract class BaseOperation implements myTypes.Operation
     this.documents = request.documents;
     this.tableOptions = request.tableOptions;
     this.secondaryInfos = request.secondaryInfos;
+    this.canCreateTable = false;
+    this.opID = request.opID;
     this.query = null;
   }
 
@@ -54,6 +58,7 @@ export abstract class BaseOperation implements myTypes.Operation
 
   protected buildTableName():string
   {
+    if(this.tableOptions.tableName !== undefined) return this.tableOptions.tableName;
     let res = "";
     for(let i:number = 0; i<this.collections.length; i++)
     {
@@ -68,25 +73,7 @@ export abstract class BaseOperation implements myTypes.Operation
     return res
   }
 
-  public static async createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
-  {
-    let res = "CREATE TABLE IF NOT EXISTS " + tableDefinition.name + " (";
-    let primaryKey:string = "(";
-    for(let i:number = 0; i<tableDefinition.keys.length; i++)
-    {
-      res = res + tableDefinition.keys[i] + " " + tableDefinition.types[i] + ", ";
-    }    
-    for(let i:number = 0; i<tableDefinition.primaryKey.length; i++)
-    {
-      primaryKey = primaryKey + tableDefinition.primaryKey[i] + ", ";
-    }
-    primaryKey = primaryKey.slice(0,-2) + ")";
-    res = res + "PRIMARY KEY " + primaryKey + ")";
-    await datastaxTools.runDB({query:res, params:[]});
-  
-    //Add tableOtions
-    //TODO
-  }
+  public abstract createTable():void;
 };
 
 export class SaveOperation extends BaseOperation
@@ -103,6 +90,7 @@ export class SaveOperation extends BaseOperation
     if(request.encObject === undefined) throw new Error("Missing field object for a save operation");
     this.object = request.encObject;
     this.options = request.options;
+    this.canCreateTable = true;
     this.buildQuery();
   }
 
@@ -185,7 +173,7 @@ export class SaveOperation extends BaseOperation
       tableDefinition.keys.push("object");
       tableDefinition.types.push("text");
     }
-    return await BaseOperation.createTable(tableDefinition);
+    return await createTable(tableDefinition);
   }
 
   protected buildEntry():myTypes.DBentry
@@ -210,33 +198,45 @@ export class SaveOperation extends BaseOperation
 export class GetOperation extends BaseOperation
 {
   filter?:myTypes.Filter;
-  order?:myTypes.Order;
+  order?:string;
   limit?:number;
   pageToken?:string;
 
   constructor(request:myTypes.InternalOperationDescription)
   {
     super(request);
+    if(request.options !== undefined)
+    {
+      this.filter = request.options.filter;
+      this.order = request.options.order;
+      this.limit = request.options.limit;
+    }
     this.buildQuery();
   }
 
   protected buildQuery():void
   {
-    let tableName:string = super.buildTableName();
-    let whereClause:myTypes.Query = super.buildPrimaryKey();
+    let tableName:string = this.buildTableName();
+    let whereClause:myTypes.Query = this.buildPrimaryKey();
     this.query = {
       query: "SELECT JSON * FROM " + tableName + " WHERE " + whereClause.query ,
       params: whereClause.params
     };
-    if(this.filter != undefined)
+    if(this.filter !== undefined)
     {
       //TODO
     }
-    if(this.order != undefined)
+    if(this.order !== undefined)
     {
-      //TODO
+      this.query.query = this.query.query + " ORDER BY " + this.order;
+    }
+    if(this.limit !== undefined)
+    {
+      this.query.query = this.query.query + " LIMIT " + this.limit;
     }
   }
+
+  public createTable():void{}
 };
 
 export class RemoveOperation extends BaseOperation
@@ -250,13 +250,15 @@ export class RemoveOperation extends BaseOperation
 
   protected buildQuery():void
   {
-    let tableName:string = super.buildTableName();
-    let whereClause:myTypes.Query = super.buildPrimaryKey();
+    let tableName:string = this.buildTableName();
+    let whereClause:myTypes.Query = this.buildPrimaryKey();
     this.query = {
       query: "DELETE FROM " + tableName + " WHERE " + whereClause.query ,
       params: whereClause.params 
     };
   }
+
+  public createTable():void{}
 };
 
 export class BatchOperation implements myTypes.Operation
@@ -322,9 +324,29 @@ export class BatchOperation implements myTypes.Operation
   {
     for(let op of this.operations)
     {
-      if(op instanceof SaveOperation) await op.createTable();
+      if(op.canCreateTable) await op.createTable();
     }
   }
-} 
+}
+
+export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
+{
+  let res = "CREATE TABLE IF NOT EXISTS " + tableDefinition.name + " (";
+  let primaryKey:string = "(";
+  for(let i:number = 0; i<tableDefinition.keys.length; i++)
+  {
+    res = res + tableDefinition.keys[i] + " " + tableDefinition.types[i] + ", ";
+  }    
+  for(let i:number = 0; i<tableDefinition.primaryKey.length; i++)
+  {
+    primaryKey = primaryKey + tableDefinition.primaryKey[i] + ", ";
+  }
+  primaryKey = primaryKey.slice(0,-2) + ")";
+  res = res + "PRIMARY KEY " + primaryKey + ")";
+  await datastaxTools.runDB({query:res, params:[]});
+
+  //Add tableOtions
+  //TODO
+}
 
 

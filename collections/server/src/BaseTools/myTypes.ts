@@ -1,5 +1,4 @@
 import {QueryOptions as QO} from "cassandra-driver";
-import { Server } from "http";
 
 export type QueryOptions = QO;
 
@@ -60,12 +59,14 @@ export type InternalOperationDescription = {
   action:action;
   collections:string[];
   documents:string[];
+  opID:string;
   clearObject?:ServerSideObject;
   encObject?:string;
   operations?:InternalOperationDescription[];
   options?:any;
   tableOptions:TableOptions;
   secondaryInfos?:WhereClause;
+  keyOverride?:DBentry;
 };
 
 export type ServerAnswer = {
@@ -122,7 +123,7 @@ export type TableDefinition = {
 };
 
 export type TableOptions = {
-  nameExtension?:string;
+  tableName?:string;
   secondaryTable:boolean;
   //TODO
 }
@@ -137,7 +138,7 @@ export type Log = InternalOperationDescription;
 
 export type LogEntry = {
   [key:string]:string;
-  log:string //stringify from a Log
+  object:string //stringify from a Log
 }
 
 export type SecondaryInfos = {

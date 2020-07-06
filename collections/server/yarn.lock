@@ -771,6 +771,13 @@ supports-color@^7.1.0:
   dependencies:
     has-flag "^4.0.0"
 
+tedis@^0.1.12:
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/tedis/-/tedis-0.1.12.tgz#e3eeccc92a5d068a35e7b16efef3e4d75cc3ef12"
+  integrity sha512-bxOKYWvdF1WsjkBYIfeO+2+xZuiqHmikqTTYPm3j/FYFpxQsX2JTBh6fFSlH6jDiCL4lfPcS2woIdD3FHopS/Q==
+  dependencies:
+    uuid "^3.3.2"
+
 term-size@^2.1.0:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/term-size/-/term-size-2.2.0.tgz#1f16adedfe9bdc18800e1776821734086fcc6753"
@@ -862,6 +869,11 @@ url-parse-lax@^3.0.0:
   integrity sha1-FrXK/Afb42dsGxmZF3gj1lA6yww=
   dependencies:
     prepend-http "^2.0.0"
+
+uuid@^3.3.2:
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
+  integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
 
 uuid@^8.2.0:
   version "8.2.0"
