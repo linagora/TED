@@ -1,5 +1,6 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
+import { runInThisContext } from "vm";
 
 export class OperationLog extends CQL.BaseOperation
 {
@@ -10,12 +11,14 @@ export class OperationLog extends CQL.BaseOperation
     {
         super({
             action: myTypes.action.log,
+            opID: operation.opID,
             collections: operation.collections,
             documents: operation.documents,
             tableOptions:{secondaryTable:false}
         });
         this.op_id = null;
-        this.entry = {log: this.createLog(operation)};
+        this.entry = {object: this.createLog(operation)};
+        this.canCreateTable = true;
         this.buildEntry();
         this.buildQuery();
     }
@@ -43,9 +46,9 @@ export class OperationLog extends CQL.BaseOperation
     protected buildQuery():void
     {
         let tableName:string = this.buildTableName();
-        let params:string[] = [];
+        let params:string[] = [this.opID];
         let keys:string = "(op_id, ";
-        let placeholders:string = "(now(), ";
+        let placeholders:string = "( ?, ";
         Object.entries(this.entry).forEach(([key, value]:string[]) => 
         {
           keys = keys + key + ", ";
@@ -76,7 +79,7 @@ export class OperationLog extends CQL.BaseOperation
     {
         let tableDefinition:myTypes.TableDefinition = {
             name: this.buildTableName(),
-            keys : ["op_id", "log"],
+            keys : ["op_id", "object"],
             types : ["timeuuid", "text"],
             primaryKey: []
         }
@@ -87,6 +90,6 @@ export class OperationLog extends CQL.BaseOperation
             tableDefinition.types.push("uuid");
         }
         tableDefinition.primaryKey.push("op_id");
-        return await CQL.BaseOperation.createTable(tableDefinition);
+        return await CQL.createTable(tableDefinition);
     }
 }

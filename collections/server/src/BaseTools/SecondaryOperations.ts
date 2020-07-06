@@ -15,6 +15,7 @@ export function getSaveOperationSecondaryIndex(operation:myTypes.InternalOperati
     if(operation.clearObject === undefined) throw new Error("Missing object for a secondary index update")
     let op = new CQL.SaveOperation({
         action: myTypes.action.save,
+        opID: operation.opID,
         collections: operation.collections,
         documents: operation.documents,
         encObject: operation.documents.slice(-1)[0],
@@ -26,9 +27,10 @@ export function getSaveOperationSecondaryIndex(operation:myTypes.InternalOperati
 
 export function getRemoveOperationSecondaryIndex(operation:myTypes.InternalOperationDescription, where?:myTypes.WhereClause):CQL.RemoveOperation
 {
-    if(operation.secondaryInfos === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
+    if(operation.secondaryInfos === undefined && where === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
     let op= new CQL.RemoveOperation({
         action: myTypes.action.remove,
+        opID: operation.opID,
         collections : operation.collections,
         documents: operation.documents,
         secondaryInfos: where === undefined ? operation.secondaryInfos : where,
@@ -42,6 +44,7 @@ export function getGetOperationSecondaryIndex(operation:myTypes.InternalOperatio
     if(operation.secondaryInfos === undefined && where === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
     let op = new CQL.GetOperation({
         action: myTypes.action.get,
+        opID: operation.opID,
         collections: operation.collections,
         documents: operation.documents,
         secondaryInfos: where === undefined ? operation.secondaryInfos : where,
@@ -73,6 +76,7 @@ export function removePreviousValue(opDescriptor:myTypes.InternalOperationDescri
     if( opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Need the object ID to remove its previuous value");
     let removeOp = new CQL.RemoveOperation({
         action: myTypes.action.remove,
+        opID: opDescriptor.opID,
         collections: opDescriptor.collections,
         documents: opDescriptor.documents,
         tableOptions: {secondaryTable:true},
@@ -86,6 +90,7 @@ export async function getPreviousValue(opDescriptor:myTypes.InternalOperationDes
     if( opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Need the object ID to check its previuous value");
     let getter:CQL.GetOperation = new CQL.GetOperation({
         action: myTypes.action.get,
+        opID: opDescriptor.opID,
         collections: opDescriptor.collections,
         documents: opDescriptor.documents,
         tableOptions: {secondaryTable: false}

@@ -5,7 +5,10 @@ import getRoutine from "./GetRoutine";
 import * as OperationLog from "./../BaseTools/OperationsTable";
 import { key } from "./../index";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
-
+import { pushOperation } from "../BaseTools/RedisTools";
+import { GetTaskStore, SaveTaskStore } from "./../BaseTools/TaskStore";
+import { BatchOperation } from "../BaseTools/BaseOperations";
+import { v1 as uuidv1 } from "uuid";
 
 
 export function processPath(path:string):{documents:string[], collections:string[]}
@@ -31,6 +34,19 @@ export function processPath(path:string):{documents:string[], collections:string
         }      
     }
     return {documents:documents, collections:collections};
+}
+
+export function buildPath(collections:string[], documents:string[]):string
+{
+    if(collections.length - documents.length > 1 && collections.length - documents.length < 0) throw new Error("Invalid documents[] ans collections[] length");
+    let path = "";
+    for(let i:number = 0; i <documents.length; i++)
+    {
+        path = path + collections[i] + "/" + documents[i] + "/";
+    }
+    if(collections.length - documents.length === 1) path = path + collections.slice(-1)[0];
+    else path = path.slice(0,-1);
+    return path;
 }
 
 export async function createOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.Operation>
@@ -72,6 +88,7 @@ export function getInternalOperationDescription(request:myTypes.ServerBaseReques
     let processedPath = processPath(request.path);
     let opDescriptor:myTypes.InternalOperationDescription = {
         action: request.action,
+        opID: uuidv1(),
         documents: processedPath.documents,
         collections: processedPath.collections,
         clearObject: request.object,
@@ -99,9 +116,9 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, )
         case myTypes.action.save:
         case myTypes.action.remove:
         {
-            let opLog = new OperationLog.OperationLog(opDescriptor);
-            await opLog.execute();
-            runWriteOperation(opDescriptor);
+            let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)]);
+            await opWrite.execute();
+            await pushOperation(request.path);
             return {status: "Success"};
         }
         case myTypes.action.get:
@@ -117,7 +134,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, )
     }    
 }
 
-async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
     switch(opDescriptor.action)
     {
