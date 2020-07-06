@@ -6,7 +6,7 @@ export const tedis = new Tedis({
     port: 6379
 });
 
-export async function pushOperation(path:string):Promise<void>
+export async function pushPending(path:string):Promise<void>
 {
     let processedPath = processPath(path);
     if(processedPath.collections.length === processedPath.documents.length)
@@ -22,7 +22,17 @@ export async function pushOperation(path:string):Promise<void>
     throw new Error("Invalid path");
 }
 
-export async function popOperation():Promise<string | null>
+export async function popPending():Promise<string | null>
 {
     return tedis.lpop("projection_tasks");
+}
+
+export async function peekPending():Promise<string | undefined>
+{
+    return (await tedis.lrange("projection_tasks", 0, 1))[0];
+}
+
+export async function removePending(path:string):Promise<void>
+{
+    await tedis.lrem("projection_tasks", 1, path);
 }
