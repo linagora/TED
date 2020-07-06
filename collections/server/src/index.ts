@@ -39,7 +39,6 @@ http.createServer(async function(req: any, res: any)
   let body_str:myTypes.ServerBaseRequest = await getHTTPBody(req);
   try
   {
-    console.log("Incoming request =\n", body_str);
     let answer = await handleRequest(body_str);
     res.write(JSON.stringify(answer));
     res.end();
