@@ -1,8 +1,6 @@
 import * as myTypes from "./myTypes";
 import * as datastaxTools from "./DatastaxTools";
 import { TStoCQLtypes } from "./SecondaryOperations";
-import { resolve } from "path";
-//import uuid from "uuid";
 
 
 export abstract class BaseOperation implements myTypes.Operation

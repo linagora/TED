@@ -1,29 +1,5 @@
 import * as myTypes from "./myTypes";
 import crypto, { Cipher, KeyObject } from "crypto";
-import { SaveOperation, GetOperation } from "./BaseOperations";
-import { clear } from "console";
-
-/* export function encryptRequest(request:myTypes.ServerBaseRequest, key:crypto.KeyObject):void
-{
-  switch(request.action)
-  {
-    case myTypes.action.save:
-    {
-      if(request.object == undefined) throw new Error("missing field object in save request");
-      request.object = encryptData({object: JSON.stringify(request.object)}, key);
-      break;
-    }
-    case myTypes.action.batch:
-    {
-      if(request.operations === undefined) throw new Error("missing field operations in batch request");
-      for(let req of request.operations)
-      {
-        encryptRequest(req, key);
-      }
-      break;
-    }
-  }
-} */
 
 export function decryptResult(ans:myTypes.ServerAnswer, key:crypto.KeyObject):void
 {

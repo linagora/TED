@@ -1,5 +1,4 @@
 import {Tedis} from "tedis";
-import * as myTypes from "./myTypes";
 import { buildPath, processPath } from "../MacroRoutines/RequestHandling"
 
 export const tedis = new Tedis({
