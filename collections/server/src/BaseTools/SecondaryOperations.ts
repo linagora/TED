@@ -1,8 +1,6 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
-import {key} from "../index";
 import { createHash } from "crypto";
-import { decryptResult } from "./CryptographicTools";
 
 
 export let TStoCQLtypes:Map<string, string>= new Map();

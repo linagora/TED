@@ -1,6 +1,5 @@
 import cassandra from "cassandra-driver";
 import * as myTypes from "./myTypes";
-import { Server } from "http";
 
 let keyspace:string = "twake_collections";
 

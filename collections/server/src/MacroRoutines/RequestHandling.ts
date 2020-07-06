@@ -6,7 +6,7 @@ import * as OperationLog from "./../BaseTools/OperationsTable";
 import { key } from "./../index";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 import { pushOperation } from "../BaseTools/RedisTools";
-import { GetTaskStore, SaveTaskStore } from "./../BaseTools/TaskStore";
+import { SaveTaskStore } from "./../BaseTools/TaskStore";
 import { BatchOperation } from "../BaseTools/BaseOperations";
 import { v1 as uuidv1 } from "uuid";
 

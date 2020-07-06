@@ -1,6 +1,5 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
-import { runInThisContext } from "vm";
 
 export class OperationLog extends CQL.BaseOperation
 {
