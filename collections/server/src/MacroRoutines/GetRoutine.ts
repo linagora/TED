@@ -13,7 +13,6 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
     if(matchingIDs.length === 0) throw EmptyResultError;
     let op = buildGetOperation(opDescriptor, matchingIDs);
-    console.log("final op =\n", op);
     return op;
 }
 
