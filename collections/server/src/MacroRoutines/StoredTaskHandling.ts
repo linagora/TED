@@ -1,7 +1,8 @@
 import * as myTypes from "../BaseTools/myTypes";
-import { peekPending, removePending } from "../BaseTools/RedisTools";
+import { peekPending, removePending, ns, queueName } from "../BaseTools/RedisTools";
 import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
-import { processPath, runWriteOperation } from "./RequestHandling";
+import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
+import Redis from "redis";
 
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
 {
@@ -43,21 +44,20 @@ async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
 
 async function runProjectionTask():Promise<void>
 {
-    let path = await peekPending();
-    if(path === undefined) 
+    let message = await peekPending();
+    if(message === null) 
     {
-        console.log("No pending operation");
         return;
     }
     try
     {
-        let operations:myTypes.DBentry[] = await getPendingOperations(path);
+        let operations:myTypes.DBentry[] = await getPendingOperations(message.message);
         console.log(operations.length + " pending operations found\n==================");
         for(let op of operations)
         {
             await runPendingOperation(op);
         }
-        await removePending(path);
+        await removePending(message.id);
     }
     catch(err)
     {
@@ -69,11 +69,25 @@ function delay(ms: number) {
     return new Promise( resolve => setTimeout(resolve, ms) );
 }
 
-export async function RedisLoop():Promise<void>
+export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    while(1)
+    let path:string = buildPath(opDescriptor.collections, opDescriptor.documents.slice(0,opDescriptor.collections.length - 1));
+    console.log(path);
+    let operationsToForward:myTypes.DBentry[] = await getPendingOperations(path);
+    for(let op of operationsToForward)
     {
-        await delay(5000);
-        await runProjectionTask();
+        await runPendingOperation(op);
     }
 }
+
+export default async function RedisLoop():Promise<void>
+{
+    let subscriber = new Redis.RedisClient({});
+    subscriber.subscribe(ns+":rt:"+queueName);
+    subscriber.on("message", (channel,message) => 
+    {
+        console.log("received message : ", message);
+        runProjectionTask();
+    });
+}
+

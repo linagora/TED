@@ -1,6 +1,7 @@
 import * as CQL from "./../BaseTools/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
 import * as secondary from "../BaseTools/SecondaryOperations";
+import { forwardCollection } from "./StoredTaskHandling";
 
 
 export let EmptyResultError = new Error("No matching object found");
@@ -10,6 +11,7 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new CQL.GetOperation(opDescriptor);
     if(opDescriptor.secondaryInfos === undefined) return new CQL.GetOperation(opDescriptor);
 
+    await forwardCollection(opDescriptor);
     let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
     if(matchingIDs.length === 0) throw EmptyResultError;
     let op = buildGetOperation(opDescriptor, matchingIDs);

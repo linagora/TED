@@ -2,7 +2,7 @@ import * as http from "http";
 import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
 import crypto from "crypto";
-import { RedisLoop } from "./MacroRoutines/StoredTaskHandling";
+import RedisLoop from "./MacroRoutines/StoredTaskHandling";
 
 //=================================================
 //                TEST CODE
