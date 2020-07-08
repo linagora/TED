@@ -65,14 +65,9 @@ async function runProjectionTask():Promise<void>
     }
 }
 
-function delay(ms: number) {
-    return new Promise( resolve => setTimeout(resolve, ms) );
-}
-
 export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
     let path:string = buildPath(opDescriptor.collections, opDescriptor.documents.slice(0,opDescriptor.collections.length - 1));
-    console.log(path);
     let operationsToForward:myTypes.DBentry[] = await getPendingOperations(path);
     for(let op of operationsToForward)
     {
@@ -80,7 +75,7 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
     }
 }
 
-export default async function RedisLoop():Promise<void>
+export async function RedisLoop():Promise<void>
 {
     let subscriber = new Redis.RedisClient({});
     subscriber.subscribe(ns+":rt:"+queueName);
@@ -91,3 +86,29 @@ export default async function RedisLoop():Promise<void>
     });
 }
 
+async function getAllOperations():Promise<myTypes.DBentry[]>
+{
+    let getOperation = new GetTaskStore({
+        action: myTypes.action.get,
+        opID: "null",
+        collections: [],
+        documents: [],
+        tableOptions: {
+            secondaryTable: false,
+            tableName: "global_taskstore"
+        },
+        keyOverride: {}
+    })
+    let result = await getOperation.execute();
+    if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query all pending operations");
+    return result.queryResults.allResultsEnc;
+}
+
+export async function fastForwardTaskStore():Promise<void>
+{
+    let allOps = await getAllOperations();
+    for(let op of allOps)
+    {
+        await runPendingOperation(op);
+    }
+}

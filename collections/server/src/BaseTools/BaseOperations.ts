@@ -71,7 +71,7 @@ export abstract class BaseOperation implements myTypes.Operation
     return res
   }
 
-  public abstract createTable():void;
+  public abstract async createTable():Promise<void>;
 };
 
 export class SaveOperation extends BaseOperation
@@ -195,7 +195,6 @@ export class SaveOperation extends BaseOperation
 
 export class GetOperation extends BaseOperation
 {
-  filter?:myTypes.Filter;
   order?:string;
   limit?:number;
   pageToken?:string;
@@ -205,7 +204,6 @@ export class GetOperation extends BaseOperation
     super(request);
     if(request.options !== undefined)
     {
-      this.filter = request.options.filter;
       this.order = request.options.order;
       this.limit = request.options.limit;
     }
@@ -217,12 +215,13 @@ export class GetOperation extends BaseOperation
     let tableName:string = this.buildTableName();
     let whereClause:myTypes.Query = this.buildPrimaryKey();
     this.query = {
-      query: "SELECT JSON * FROM " + tableName + " WHERE " + whereClause.query ,
-      params: whereClause.params
+      query: "SELECT JSON * FROM " + tableName ,
+      params: []
     };
-    if(this.filter !== undefined)
+    if(whereClause.params.length > 0)
     {
-      //TODO
+      this.query.query = this.query.query + " WHERE " + whereClause.query;
+      this.query.params = whereClause.params;
     }
     if(this.order !== undefined)
     {
@@ -234,7 +233,7 @@ export class GetOperation extends BaseOperation
     }
   }
 
-  public createTable():void{}
+  public async createTable():Promise<void>{}
 };
 
 export class RemoveOperation extends BaseOperation
@@ -256,7 +255,7 @@ export class RemoveOperation extends BaseOperation
     };
   }
 
-  public createTable():void{}
+  public async createTable():Promise<void>{}
 };
 
 export class BatchOperation implements myTypes.Operation

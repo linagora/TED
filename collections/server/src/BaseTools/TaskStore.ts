@@ -99,8 +99,6 @@ export class GetTaskStore extends CQL.GetOperation
         res = res.slice(0,-5);
         return {query: res, params: params};
     }
-  
-    public createTable():void{}
 };
 
 export class RemoveTaskStore extends CQL.RemoveOperation
@@ -133,6 +131,4 @@ export class RemoveTaskStore extends CQL.RemoveOperation
         res = res.slice(0,-5);
         return {query: res, params: params};
     }
-  
-    public createTable():void{}
 }

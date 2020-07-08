@@ -12,7 +12,9 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     let opArray:CQL.BaseOperation[] = [];
     try
     {
-        let previousVersion:myTypes.ServerSideObject =  myCrypto.decryptData( await secondary.getPreviousValue(opDescriptor), key);
+        let previousValueEnc = await secondary.getPreviousValue(opDescriptor);
+        if(previousValueEnc === null) throw new Error("Unable to find a previous value");
+        let previousVersion:myTypes.ServerSideObject =  myCrypto.decryptData( previousValueEnc, key);
         opDescriptor.clearObject = {...previousVersion, ...opDescriptor.clearObject};
         Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
         {
