@@ -11,7 +11,9 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
     if(opDescriptor.collections.length === opDescriptor.documents.length)
     {
         opArray.push(new CQL.RemoveOperation(opDescriptor));
-        let previousValue:myTypes.ServerSideObject = myCrypto.decryptData( await secondary.getPreviousValue(opDescriptor), key);
+        let previousValueEnc = await secondary.getPreviousValue(opDescriptor);
+        if(previousValueEnc === null) return new CQL.BatchOperation([]);
+        let previousValue:myTypes.ServerSideObject = myCrypto.decryptData(previousValueEnc, key);
         Object.entries(previousValue).forEach( ([key, value]) =>
         {
             if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined)

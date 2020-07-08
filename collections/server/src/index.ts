@@ -2,12 +2,24 @@ import * as http from "http";
 import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
 import crypto from "crypto";
-import RedisLoop from "./MacroRoutines/StoredTaskHandling";
+import { RedisLoop, fastForwardTaskStore } from "./MacroRoutines/StoredTaskHandling";
 
 //=================================================
 //                TEST CODE
 
 export const key:crypto.KeyObject = crypto.createSecretKey(crypto.createHash('sha256').update('test').digest());
+
+fastForwardTaskStore()
+.catch( (err:myTypes.CQLResponseError) =>
+{
+  console.error(err);
+  if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+  {
+    console.log("TaskStore doesn't exist, nothing to fast forward.");
+    return;
+  }
+  throw err;
+});;
 
 async function getHTTPBody(req:any):Promise<myTypes.ServerBaseRequest>
 {

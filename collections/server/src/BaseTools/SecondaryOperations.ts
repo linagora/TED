@@ -83,7 +83,7 @@ export function removePreviousValue(opDescriptor:myTypes.InternalOperationDescri
     return removeOp;
 }
 
-export async function getPreviousValue(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.EncObject>
+export async function getPreviousValue(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.EncObject | null>
 {
     if( opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Need the object ID to check its previuous value");
     let getter:CQL.GetOperation = new CQL.GetOperation({
@@ -94,6 +94,6 @@ export async function getPreviousValue(opDescriptor:myTypes.InternalOperationDes
         tableOptions: {secondaryTable: false}
     });
     let DBanswer = await getter.execute();
-    if(DBanswer.queryResults === undefined || DBanswer.queryResults.allResultsEnc === undefined || DBanswer.queryResults.allResultsEnc.length === 0) throw new Error("Unable to find a previous value");
+    if(DBanswer.queryResults === undefined || DBanswer.queryResults.allResultsEnc === undefined || DBanswer.queryResults.allResultsEnc.length === 0) return null;
     return JSON.parse(DBanswer.queryResults.allResultsEnc[0].object);
 }
