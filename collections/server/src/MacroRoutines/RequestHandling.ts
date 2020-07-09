@@ -3,7 +3,7 @@ import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
 import getRoutine from "./GetRoutine";
 import * as OperationLog from "./../BaseTools/OperationsTable";
-import { key } from "./../index";
+import { key } from "../Config/config";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 import { pushPending } from "../BaseTools/RedisTools";
 import { SaveTaskStore } from "./../BaseTools/TaskStore";
@@ -38,7 +38,7 @@ export function processPath(path:string):{documents:string[], collections:string
 
 export function buildPath(collections:string[], documents:string[]):string
 {
-    if(collections.length - documents.length > 1 && collections.length - documents.length < 0) throw new Error("Invalid documents[] ans collections[] length");
+    if(collections.length - documents.length > 1 || collections.length - documents.length < 0) throw new Error("Invalid documents[] and collections[] length");
     let path = "";
     for(let i:number = 0; i <documents.length; i++)
     {
@@ -140,12 +140,12 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
     {
         case myTypes.action.save:
         {
-            (await saveRoutine(opDescriptor)).execute();
+            await (await saveRoutine(opDescriptor)).execute();
             break;
         }
         case myTypes.action.remove:
         {
-            (await removeRoutine(opDescriptor)).execute();
+            await (await removeRoutine(opDescriptor)).execute();
             break;
         }
         default:

@@ -1,13 +1,14 @@
 import cassandra from "cassandra-driver";
 import * as myTypes from "./myTypes";
+import { v4 as uuidv4 } from "uuid";
+import * as config from "../Config/config";
 
-let keyspace:string = "twake_collections";
 
-const client = new cassandra.Client(
+export const client = new cassandra.Client(
 {
-    contactPoints: ['127.0.0.1'],
-    localDataCenter: 'datacenter1',
-    keyspace: keyspace,
+    contactPoints: config.cassandraContactPoint,
+    localDataCenter: config.cassandraLocalDatacenter,
+    keyspace: config.cassandraKeyspace,
     policies: {
       retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
     },
@@ -15,44 +16,62 @@ const client = new cassandra.Client(
       isIdempotent: true
     }
 });
-  
-client.connect()
-.catch( async (err:myTypes.CQLResponseError) => 
+ 
+export async function setup():Promise<void>
 {
-    if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
-    {
-    return await createKeyspace(keyspace, defaultKeyspaceOptions);
-    }
-})
-.then( () => client.connect());
+  await client.connect()
+  .catch( async (err:myTypes.CQLResponseError) => 
+  {
+      if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
+      {
+      return await createKeyspace(config.cassandraKeyspace, config.defaultCassandraKeyspaceOptions);
+      }
+  })
+  .then( () => client.connect());
+}
 
 const defaultQueryOptions:myTypes.QueryOptions = {
-    keyspace:keyspace,
+    keyspace:config.cassandraKeyspace,
     prepare:true,
 }
 
-const defaultKeyspaceOptions:myTypes.KeyspaceReplicationOptions = 
-{
-    class:"SimpleStrategy",
-    replication_factor:3
-};
-
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
-  console.log("Query =\n",query);
-  let rs:any;
-  if(options === undefined) options = defaultQueryOptions;
-  rs = await client.execute(query.query, query.params, options);
-  return processResult(rs);
+  let queryID = uuidv4()
+  console.log("Begin query "+ queryID + ",\n   " + JSON.stringify(query) );
+  try
+  {
+    let rs:any;
+    if(options === undefined) options = defaultQueryOptions;
+    rs = await client.execute(query.query, query.params, options);
+    console.log("   End query ", queryID);
+    return processResult(rs);
+  }
+  catch(err)
+  {
+    console.log("   Error thrown by query ", queryID, "  :  ", err.message);
+    throw err;
+  }
 };
 
 export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
-  console.log("Queries =\n",queries);
-  let rs:any;
-  if(options === undefined) options = defaultQueryOptions;
-  rs = await client.batch(queries, options);
-  return processResult(rs);
+  let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
+  let queryID = uuidv4()
+  console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
+  try
+  {
+    let rs:any;
+    if(options === undefined) options = defaultQueryOptions;
+    rs = await client.batch(queries, options);
+    console.log("   End query ", queryID);
+    return processResult(rs);
+  }
+  catch(err)
+  {
+    console.log("   Error thrown by query ", queryID, "  :  ", err.message);
+    throw err;
+  }
 }
 
 function processResult(rs:any):myTypes.ServerAnswer
@@ -78,7 +97,6 @@ function processResult(rs:any):myTypes.ServerAnswer
       queryResults.allResultsClear.push(object);
     }
   }
-  console.log("Result =\n",queryResults);
   return {status: "success", queryResults:queryResults};
 }
 
@@ -89,8 +107,8 @@ export async function createKeyspace(keyspaceName:string, options:myTypes.Keyspa
   let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
   res = res.split('"').join("'");
   let clientTemp = new cassandra.Client({
-    contactPoints: ['127.0.0.1'],
-    localDataCenter: 'datacenter1',
+    contactPoints: config.cassandraContactPoint,
+    localDataCenter: config.cassandraLocalDatacenter,
   });
   console.log(res);
   await clientTemp.execute(res);

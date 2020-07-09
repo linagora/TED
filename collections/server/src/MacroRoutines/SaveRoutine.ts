@@ -1,7 +1,7 @@
 import * as CQL from "./../BaseTools/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
 import * as secondary from "../BaseTools/SecondaryOperations";
-import { key } from "./../index";
+import { key } from "../Config/config";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 
 
@@ -12,9 +12,11 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     let opArray:CQL.BaseOperation[] = [];
     try
     {
+        console.log("getting previous value");
         let previousValueEnc = await secondary.getPreviousValue(opDescriptor);
         if(previousValueEnc === null) throw new Error("Unable to find a previous value");
         let previousVersion:myTypes.ServerSideObject =  myCrypto.decryptData( previousValueEnc, key);
+        console.log("previous value = ", JSON.stringify(previousVersion));
         opDescriptor.clearObject = {...previousVersion, ...opDescriptor.clearObject};
         Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
         {
@@ -25,8 +27,9 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
             }
         });
     }
-    catch
-    {
+    catch(err)
+    {   
+        console.error(err);
         Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
         {
             if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined)
@@ -35,6 +38,7 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
             }
         });
     }
+    myCrypto.encryptOperation(opDescriptor, key);
     opArray.push(new CQL.SaveOperation(opDescriptor));
     return new CQL.BatchOperation(opArray);
 }

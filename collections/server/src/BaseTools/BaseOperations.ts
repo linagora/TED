@@ -1,7 +1,9 @@
 import * as myTypes from "./myTypes";
 import * as datastaxTools from "./DatastaxTools";
 import { TStoCQLtypes } from "./SecondaryOperations";
+import { TaskTable } from "./AntiDuplicata";
 
+let runningTableCreation = new TaskTable();
 
 export abstract class BaseOperation implements myTypes.Operation
 {
@@ -54,7 +56,7 @@ export abstract class BaseOperation implements myTypes.Operation
     return {query: res, params: params};
   }
 
-  protected buildTableName():string
+  public buildTableName():string
   {
     if(this.tableOptions.tableName !== undefined) return this.tableOptions.tableName;
     let res = "";
@@ -284,20 +286,15 @@ export class BatchOperation implements myTypes.Operation
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
-    return datastaxTools.runBatchDB(this.queries)
+    return await datastaxTools.runBatchDB(this.queries)
     .catch(async (err:myTypes.CQLResponseError) =>
     {
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
-        this.tableCreationFlag = true;
-        return await this.createAllTables()
-        .then( async () => 
-        {
-          if(this.queries === null) throw new Error("Error in batch, invalid query");
-          return await datastaxTools.runBatchDB(this.queries);
-        });
+        await this.createTable(err.message);
+        return await this.execute();
       }
-      return {status: "error", error:err};
+      return {status: "error", error: err};
     });
   }
 
@@ -324,9 +321,72 @@ export class BatchOperation implements myTypes.Operation
       if(op.canCreateTable) await op.createTable();
     }
   }
+
+  protected async createTable(errmsg:string):Promise<void>
+  {
+    this.tableCreationFlag = true;
+    let parse = errmsg.match(/ [a-zA-Z0-9_]*$/);
+    if(parse === null) throw new Error("Unable to parse table name in batch error");
+    let tableName = parse[0].slice(1);
+    console.log(tableName);
+
+    for(let op of this.operations)
+    {
+      let tmp = op.buildTableName();
+      if(tmp === tableName)
+      {
+        await op.createTable();
+        return;
+      }
+    }
+    throw new Error("Unable to find which operation triggered the error inside the batch " + tableName);
+  }
 }
 
 export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
+{
+  if(runningTableCreation.isDone(tableDefinition.name)) return;
+  if(runningTableCreation.isRunning(tableDefinition.name))
+  {
+    console.log("Waiting for creation of table ", tableDefinition.name);
+    await runningTableCreation.waitTask(tableDefinition.name);
+    return;
+  }
+  runningTableCreation.pushTask(tableDefinition.name);
+  await createTableRetry(tableDefinition);
+  runningTableCreation.endTask(tableDefinition.name);
+}
+
+export async function createTableRetry(tableDefinition:myTypes.TableDefinition):Promise<void>
+{
+  let query = createTableQuery(tableDefinition);
+  await datastaxTools.runDB(query)
+  .catch( async (err) => 
+  {
+    await delay(1000);
+    await datastaxTools.runDB(query);
+  })
+  .catch( async (err) => 
+  {
+    await delay(2000);
+    await datastaxTools.runDB(query);
+  })
+  .catch( async (err) => 
+  {
+    await delay(5000);
+    await datastaxTools.runDB(query);
+  })
+  .catch( async (err) => 
+  {
+    await delay(10000);
+    await datastaxTools.runDB(query);
+  });
+
+  //Add tableOtions
+  //TODO
+}
+
+function createTableQuery(tableDefinition:myTypes.TableDefinition):myTypes.Query
 {
   let res = "CREATE TABLE IF NOT EXISTS " + tableDefinition.name + " (";
   let primaryKey:string = "(";
@@ -340,10 +400,11 @@ export async function createTable(tableDefinition:myTypes.TableDefinition):Promi
   }
   primaryKey = primaryKey.slice(0,-2) + ")";
   res = res + "PRIMARY KEY " + primaryKey + ")";
-  await datastaxTools.runDB({query:res, params:[]});
-
-  //Add tableOtions
-  //TODO
+  return {query: res, params:[]};
 }
 
+async function delay(ms:number):Promise<void>
+{
+    return new Promise( resolve => setTimeout(resolve, ms) );
+}
 

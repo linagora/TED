@@ -2,3 +2,4 @@ node_modules
 build
 coverage
 yarn-error.log
+src/Config/config.ts

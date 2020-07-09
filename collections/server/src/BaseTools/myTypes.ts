@@ -106,7 +106,7 @@ export type DBentry = {
 export type EncObject = {
   data:string;
   iv:string;
-  auth:string;
+  auth?:string;
 }
 
 export type OperationID = {

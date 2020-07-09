@@ -1,11 +1,12 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
-import {buildPath} from "./../MacroRoutines/RequestHandling";
+import { buildPath } from "./../MacroRoutines/RequestHandling";
+import { defaultTaskStoreTTL } from "../Config/config";
 
 export class SaveTaskStore extends CQL.BaseOperation
 {
     entry:myTypes.LogEntry;
-    ttl:number = 3600;
+    ttl:number = defaultTaskStoreTTL;
 
     constructor(operation:myTypes.InternalOperationDescription)
     {
@@ -36,7 +37,7 @@ export class SaveTaskStore extends CQL.BaseOperation
     }
   
 
-    protected buildTableName():string
+    public buildTableName():string
     {
         return "global_taskstore";
     }
@@ -81,14 +82,13 @@ export class GetTaskStore extends CQL.GetOperation
         this.buildQuery();
     }
 
-    protected buildTableName():string
+    public buildTableName():string
     {
         return "global_taskstore";
     }
 
     protected buildPrimaryKey():myTypes.Query
     {
-        if(this.keyOverride === undefined) return {query:"", params:[]};
         let res = "";
         let params:string[] = [];
         Object.entries(this.keyOverride).forEach( ([key, value]) => 
@@ -113,14 +113,13 @@ export class RemoveTaskStore extends CQL.RemoveOperation
         this.buildQuery();
     }
 
-    protected buildTableName():string
+    public buildTableName():string
     {
         return "global_taskstore";
     }
 
     protected buildPrimaryKey():myTypes.Query
     {
-        if(this.keyOverride === undefined) return {query:"", params:[]};
         let res = "";
         let params:string[] = [];
         Object.entries(this.keyOverride).forEach( ([key, value]) => 

@@ -1,25 +1,27 @@
 import * as http from "http";
 import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
-import crypto from "crypto";
 import { RedisLoop, fastForwardTaskStore } from "./MacroRoutines/StoredTaskHandling";
+import { setup as cassandraSetup } from "./BaseTools/DatastaxTools";
+import { setup as redisSetup } from "./BaseTools/RedisTools";
 
-//=================================================
-//                TEST CODE
 
-export const key:crypto.KeyObject = crypto.createSecretKey(crypto.createHash('sha256').update('test').digest());
-
-fastForwardTaskStore()
-.catch( (err:myTypes.CQLResponseError) =>
+async function setup():Promise<void>
 {
-  console.error(err);
-  if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+  await redisSetup();
+  await cassandraSetup();
+  await fastForwardTaskStore()
+  .catch( (err:myTypes.CQLResponseError) =>
   {
-    console.log("TaskStore doesn't exist, nothing to fast forward.");
-    return;
-  }
-  throw err;
-});;
+    console.error(err);
+    if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+    {
+      console.log("TaskStore doesn't exist, nothing to fast forward.");
+      return;
+    }
+    throw err;
+  });;
+}
 
 async function getHTTPBody(req:any):Promise<myTypes.ServerBaseRequest>
 {
@@ -45,24 +47,28 @@ async function getHTTPBody(req:any):Promise<myTypes.ServerBaseRequest>
   }) 
 }
 
-http.createServer(async function(req: any, res: any)
+
+async function main():Promise<void>
 {
-  console.log("\n\n ===== New Incoming Request =====");11
-  let body_str:myTypes.ServerBaseRequest = await getHTTPBody(req);
-  try
+  console.log("This is a highway to hell");
+  await setup();
+  http.createServer(async function(req: any, res: any)
   {
-    let answer = await handleRequest(body_str);
-    res.write(JSON.stringify(answer));
-    res.end();
-  }
-  catch(err)
-  {
-    console.log("catch2 \n",err);
-    res.write('{"status":"' + err.toString() + '"}');
-    res.end();
-  }
-}).listen(8080);
-
-console.log("This is a highway to hell");
-
-RedisLoop();
+    console.log("\n\n ===== New Incoming Request =====");11
+    let body_str:myTypes.ServerBaseRequest = await getHTTPBody(req);
+    try
+    {
+      let answer = await handleRequest(body_str);
+      res.write(JSON.stringify(answer));
+      res.end();
+    }
+    catch(err)
+    {
+      console.log("catch2 \n",err);
+      res.write('{"status":"' + err.toString() + '"}');
+      res.end();
+    }
+  }).listen(8080);
+  RedisLoop();
+}
+main();
