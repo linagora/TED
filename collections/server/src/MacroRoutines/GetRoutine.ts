@@ -8,10 +8,11 @@ export let EmptyResultError = new Error("No matching object found");
 
 export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<CQL.GetOperation>
 {
+    await forwardCollection(opDescriptor);
+
     if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new CQL.GetOperation(opDescriptor);
     if(opDescriptor.secondaryInfos === undefined) return new CQL.GetOperation(opDescriptor);
 
-    await forwardCollection(opDescriptor);
     let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
     if(matchingIDs.length === 0) throw EmptyResultError;
     let op = buildGetOperation(opDescriptor, matchingIDs);

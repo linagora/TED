@@ -1,29 +1,27 @@
 import { buildPath, processPath } from "../MacroRoutines/RequestHandling";
 import RedisSMQ from "rsmq";
 import { promisify } from "util";
+import * as config from "../Config/config";
 
-/* export const tedis = new Tedis({
-    host: "127.0.0.1",
-    port: 6379
-}); */
 
 export const queueName = "projection-tasks";
-export const ns = "twake_collections";
-export const rsmq = new RedisSMQ({ns : ns, realtime: true});
+export const rsmq = new RedisSMQ({ns : config.redisNamespace, realtime: true});
 
-const createQueuePromise = promisify(rsmq.createQueue);
+export const createQueuePromise = promisify(rsmq.createQueue);
 const sendMessagePromise = promisify(rsmq.sendMessage);
 const receiveMessagePromise = promisify(rsmq.receiveMessage);
 const deleteMessagePromise = promisify(rsmq.deleteMessage);
 
- 
-createQueuePromise({qname: queueName})
-.then( () => console.log('Queue created'))
-.catch( (err:Error) => 
+export async function setup():Promise<void>
 {
-    if(err.name === "queueExists") console.log("Queue already created");
-    else console.error(err);
-});
+    await createQueuePromise({qname: queueName})
+    .then( () => console.log('Queue created'))
+    .catch( (err:Error) => 
+    {
+        if(err.name === "queueExists") console.log("Queue already created");
+        else console.error(err);
+    });
+}
 
 export async function pushPending(path:string):Promise<void>
 {

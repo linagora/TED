@@ -1,7 +1,8 @@
 import * as myTypes from "../BaseTools/myTypes";
-import { peekPending, removePending, ns, queueName } from "../BaseTools/RedisTools";
+import { peekPending, removePending } from "../BaseTools/RedisTools";
 import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
+import { taskStoreBatchSize } from "../Config/config";
 import Redis from "redis";
 
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
@@ -21,7 +22,7 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
         },
         options: {
             order: "op_id ASC",
-            limit: 20
+            limit: taskStoreBatchSize
         }
     })
     let result = await getOperation.execute();
@@ -68,6 +69,7 @@ async function runProjectionTask():Promise<void>
 export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
     let path:string = buildPath(opDescriptor.collections, opDescriptor.documents.slice(0,opDescriptor.collections.length - 1));
+    console.log("collection to forward", path);
     let operationsToForward:myTypes.DBentry[] = await getPendingOperations(path);
     for(let op of operationsToForward)
     {
@@ -78,11 +80,14 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
 export async function RedisLoop():Promise<void>
 {
     let subscriber = new Redis.RedisClient({});
-    subscriber.subscribe(ns+":rt:"+queueName);
+    //subscriber.subscribe(ns+":rt:"+queueName);
     subscriber.on("message", (channel,message) => 
     {
-        console.log("received message : ", message);
-        runProjectionTask();
+        console.log("messages unread : ", message);
+        for(let i:number = 0 ; i < parseInt(message); i++)
+        {
+            runProjectionTask();
+        }
     });
 }
 

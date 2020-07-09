@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start:dev": "nodemon"
+    "start": "nodemon --watch false",
+    "start:dev": "nodemon",
+    "start:tests": "nodemon --exec ts-node ./src/__tests__/index.spec.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,9 +19,13 @@
     "typescript": "^3.9.5"
   },
   "dependencies": {
+    "@sentry/node": "5.19.1",
+    "@types/deep-equal": "^1.0.1",
     "@types/uuid": "^8.0.0",
+    "axios": "^0.19.2",
     "cassandra-driver": "^4.5.2",
     "crypto": "^1.0.1",
+    "deep-equal": "^2.0.3",
     "esm": "^3.2.25",
     "js-base64": "^2.6.2",
     "redis": "^3.0.2",

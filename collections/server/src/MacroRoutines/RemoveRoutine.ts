@@ -1,7 +1,7 @@
 import * as CQL from "./../BaseTools/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
 import * as secondary from "../BaseTools/SecondaryOperations";
-import { key } from "./../index";
+import { key } from "../Config/config";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 
 

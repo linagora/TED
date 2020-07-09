@@ -1,5 +1,6 @@
 import * as myTypes from "./myTypes";
-import crypto, { Cipher, KeyObject } from "crypto";
+import crypto from "crypto";
+import { cryptoAlgorithm } from "../Config/config";
 
 export function decryptResult(ans:myTypes.ServerAnswer, key:crypto.KeyObject):void
 {
@@ -19,7 +20,7 @@ export function decryptResult(ans:myTypes.ServerAnswer, key:crypto.KeyObject):vo
   }
 }
 
-export function encryptOperation(operation:myTypes.InternalOperationDescription, key:KeyObject):void
+export function encryptOperation(operation:myTypes.InternalOperationDescription, key:crypto.KeyObject):void
 {
   if(operation.action === myTypes.action.save && operation.clearObject !== undefined) operation.encObject = JSON.stringify(encryptData(operation.clearObject, key));
   else if(operation.action === myTypes.action.batch && operation.operations !== undefined)
@@ -31,24 +32,36 @@ export function encryptOperation(operation:myTypes.InternalOperationDescription,
   }
 }
 
-function encryptData(data:myTypes.ServerSideObject, key:KeyObject):myTypes.EncObject
+function encryptData(data:myTypes.ServerSideObject, key:crypto.KeyObject):myTypes.EncObject
 {
   let iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const cipher:crypto.Cipher = crypto.createCipheriv(cryptoAlgorithm, key, iv);
   let encData:string = cipher.update(JSON.stringify(data), 'utf8', 'hex');
   encData += cipher.final('hex');
-  let encObject:myTypes.EncObject = {data: encData, iv: iv.toString('base64'), auth: cipher.getAuthTag().toString('base64')};
+  let encObject:myTypes.EncObject;
+  if(isCipherGCM(cipher)) encObject = {data: encData, iv: iv.toString('base64'), auth: cipher.getAuthTag().toString('base64')};
+  else encObject = {data: encData, iv : iv.toString("base64")};
   return encObject;
 }
 
-export function decryptData(encObject:myTypes.EncObject, key:KeyObject):myTypes.ServerSideObject
+export function decryptData(encObject:myTypes.EncObject, key:crypto.KeyObject):myTypes.ServerSideObject
 {
     if(encObject.iv === undefined) throw new Error("Unable to decrypt data, missing iv");
     if(encObject.auth === undefined) throw new Error("Unable to decrypt data, missing auth");
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(encObject.iv, 'base64'));
-    decipher.setAuthTag(Buffer.from(encObject.auth, 'base64'));
+    const decipher:crypto.Decipher = crypto.createDecipheriv(cryptoAlgorithm, key, Buffer.from(encObject.iv, 'base64'));
+    if(isDecipherGCM(decipher)) decipher.setAuthTag(Buffer.from(encObject.auth, 'base64'));
     let clearData:string = decipher.update(encObject.data, 'hex', 'utf8');
     clearData += decipher.final('utf8');
     let clearObject:myTypes.ServerSideObject = JSON.parse(clearData);
     return clearObject;
+}
+
+function isCipherGCM(cipher:crypto.Cipher): cipher is crypto.CipherGCM
+{
+  return (cipher as crypto.CipherGCM).getAuthTag !== undefined;
+}
+
+function isDecipherGCM(decipher:crypto.Decipher): decipher is crypto.DecipherGCM
+{
+  return (decipher as crypto.DecipherGCM).setAuthTag !== undefined;
 }

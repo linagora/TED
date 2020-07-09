@@ -37,7 +37,7 @@ export class OperationLog extends CQL.BaseOperation
     }
   
 
-    protected buildTableName():string
+    public buildTableName():string
     {
         return super.buildTableName() + "__operations";
     }
