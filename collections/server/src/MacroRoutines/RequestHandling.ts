@@ -3,7 +3,6 @@ import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
 import getRoutine from "./GetRoutine";
 import * as OperationLog from "./../BaseTools/OperationsTable";
-import { key } from "../Config/config";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 import { pushPending } from "../BaseTools/RedisTools";
 import { SaveTaskStore } from "./../BaseTools/TaskStore";
@@ -110,7 +109,7 @@ export function getInternalOperationDescription(request:myTypes.ServerBaseReques
 export default async function handleRequest(request:myTypes.ServerBaseRequest, ):Promise<myTypes.ServerAnswer>
 {
     let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request);
-    myCrypto.encryptOperation(opDescriptor, key);
+    myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
     switch(opDescriptor.action)
     {
         case myTypes.action.save:
@@ -124,7 +123,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, )
         case myTypes.action.get:
         {
             let res = await runReadOperation(opDescriptor);
-            myCrypto.decryptResult(res, key);
+            myCrypto.decryptResult(res, myCrypto.globalKey);
             return res;
         }
         default:

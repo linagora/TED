@@ -109,3 +109,26 @@ export async function writeFusion():Promise<void>
   await Promise.all(promises);
   console.log(await getObject(path));
 }
+
+export async function removeObject(path:string):Promise<void>
+{
+    const response = await post("http://localhost:8080/", {
+        data: {
+            action: "remove",
+            path: path
+        }
+    });
+    console.log(response.data);
+}
+
+export async function writeReadDelRead():Promise<void>
+{
+    let obj = randomObject();
+    let path = obj.path;
+    console.log(obj);
+    await saveObject(obj);
+
+    console.log(await getObject(path));
+    await removeObject(path);
+    console.log(await getObject(path));
+}

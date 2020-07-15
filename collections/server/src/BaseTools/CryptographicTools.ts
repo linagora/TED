@@ -1,6 +1,13 @@
 import * as myTypes from "./myTypes";
 import crypto from "crypto";
 import { cryptoAlgorithm } from "../Config/config";
+import * as config from "./../Config/config";
+
+const password:Buffer = Buffer.from(config.password, "hex");
+const salt:Buffer = Buffer.from(config.salt, "hex");
+export const globalKey = crypto.createSecretKey(crypto.pbkdf2Sync(password, salt, 1000000, config.keyLen, "sha512"));
+
+
 
 export function decryptResult(ans:myTypes.ServerAnswer, key:crypto.KeyObject):void
 {
@@ -46,14 +53,14 @@ function encryptData(data:myTypes.ServerSideObject, key:crypto.KeyObject):myType
 
 export function decryptData(encObject:myTypes.EncObject, key:crypto.KeyObject):myTypes.ServerSideObject
 {
-    if(encObject.iv === undefined) throw new Error("Unable to decrypt data, missing iv");
-    if(encObject.auth === undefined) throw new Error("Unable to decrypt data, missing auth");
-    const decipher:crypto.Decipher = crypto.createDecipheriv(cryptoAlgorithm, key, Buffer.from(encObject.iv, 'base64'));
-    if(isDecipherGCM(decipher)) decipher.setAuthTag(Buffer.from(encObject.auth, 'base64'));
-    let clearData:string = decipher.update(encObject.data, 'hex', 'utf8');
-    clearData += decipher.final('utf8');
-    let clearObject:myTypes.ServerSideObject = JSON.parse(clearData);
-    return clearObject;
+  if(encObject.iv === undefined) throw new Error("Unable to decrypt data, missing iv");
+  if(encObject.auth === undefined) throw new Error("Unable to decrypt data, missing auth");
+  const decipher:crypto.Decipher = crypto.createDecipheriv(cryptoAlgorithm, key, Buffer.from(encObject.iv, 'base64'));
+  if(isDecipherGCM(decipher)) decipher.setAuthTag(Buffer.from(encObject.auth, 'base64'));
+  let clearData:string = decipher.update(encObject.data, 'hex', 'utf8');
+  clearData += decipher.final('utf8');
+  let clearObject:myTypes.ServerSideObject = JSON.parse(clearData);
+  return clearObject;
 }
 
 function isCipherGCM(cipher:crypto.Cipher): cipher is crypto.CipherGCM

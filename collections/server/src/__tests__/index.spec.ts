@@ -1,4 +1,4 @@
-import {saveObject, randomObject, createdObjects, getObject, writeFusion } from "./TestsUnitaires";
+import {saveObject, randomObject, createdObjects, getObject, writeFusion, writeReadDelRead } from "./TestsUnitaires";
 import { writeFile, readFile } from "fs"
 import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
@@ -11,7 +11,7 @@ async function delay(ms:number):Promise<void>
 }
 
 
-writeFusion();
+writeReadDelRead();
 
 //getObject("b/2704dcd3-1f82-43e3-9da5-f539fd2e2110/aa/f61ed9ab-3cbd-4c98-ba86-6d369d610094/aaa/5f6d16e8-59bd-4388-9005-bc39cd52ee3f").then( (res) => console.log(res));
 
@@ -59,6 +59,3 @@ async function testCassandra():Promise<void>
     }
 }
 //testCassandra();
-
-let tmp = crypto.randomBytes(64);
-console.log(tmp.toString("hex"));

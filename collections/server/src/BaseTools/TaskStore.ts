@@ -89,6 +89,7 @@ export class GetTaskStore extends CQL.GetOperation
 
     protected buildPrimaryKey():myTypes.Query
     {
+        if(this.keyOverride === undefined) return {query: "", params: []};
         let res = "";
         let params:string[] = [];
         Object.entries(this.keyOverride).forEach( ([key, value]) => 
@@ -120,6 +121,7 @@ export class RemoveTaskStore extends CQL.RemoveOperation
 
     protected buildPrimaryKey():myTypes.Query
     {
+        if(this.keyOverride === undefined) return {query: "", params: []};
         let res = "";
         let params:string[] = [];
         Object.entries(this.keyOverride).forEach( ([key, value]) => 
