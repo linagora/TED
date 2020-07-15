@@ -4,23 +4,19 @@ import * as myTypes from "./BaseTools/myTypes";
 import { RedisLoop, fastForwardTaskStore } from "./MacroRoutines/StoredTaskHandling";
 import { setup as cassandraSetup } from "./BaseTools/DatastaxTools";
 import { setup as redisSetup } from "./BaseTools/RedisTools";
+import * as config from "./Config/config";
+
+if(config.sentry === true)
+{
+  let Sentry = require("@sentry/node");
+  Sentry.init({dsn: config.sentryDSN});
+}
 
 
 async function setup():Promise<void>
 {
   await redisSetup();
   await cassandraSetup();
-  await fastForwardTaskStore()
-  .catch( (err:myTypes.CQLResponseError) =>
-  {
-    console.error(err);
-    if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
-    {
-      console.log("TaskStore doesn't exist, nothing to fast forward.");
-      return;
-    }
-    throw err;
-  });;
 }
 
 async function getHTTPBody(req:any):Promise<myTypes.ServerBaseRequest>
@@ -52,6 +48,19 @@ async function main():Promise<void>
 {
   console.log("This is a highway to hell");
   await setup();
+  RedisLoop();
+  await fastForwardTaskStore()
+  .catch( (err:myTypes.CQLResponseError) =>
+  {
+    console.error(err);
+    if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+    {
+      console.log("TaskStore doesn't exist, nothing to fast forward.");
+      return;
+    }
+    throw err;
+  });
+  
   http.createServer(async function(req: any, res: any)
   {
     console.log("\n\n ===== New Incoming Request =====");11
@@ -69,6 +78,5 @@ async function main():Promise<void>
       res.end();
     }
   }).listen(8080);
-  RedisLoop();
 }
 main();

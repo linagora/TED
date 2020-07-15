@@ -1,8 +1,8 @@
 import * as myTypes from "../BaseTools/myTypes";
-import { peekPending, removePending } from "../BaseTools/RedisTools";
+import { peekPending, removePending, queueName, pushPending } from "../BaseTools/RedisTools";
 import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
-import { taskStoreBatchSize } from "../Config/config";
+import { taskStoreBatchSize, redisNamespace } from "../Config/config";
 import Redis from "redis";
 
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
@@ -70,24 +70,25 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
 {
     let path:string = buildPath(opDescriptor.collections, opDescriptor.documents.slice(0,opDescriptor.collections.length - 1));
     console.log("collection to forward", path);
-    let operationsToForward:myTypes.DBentry[] = await getPendingOperations(path);
-    for(let op of operationsToForward)
+    let operationsToForward:myTypes.DBentry[]
+    do
     {
-        await runPendingOperation(op);
-    }
+        operationsToForward = await getPendingOperations(path);
+        for(let op of operationsToForward)
+        {
+            await runPendingOperation(op);
+        }
+    }while(operationsToForward.length == taskStoreBatchSize )    
 }
 
 export async function RedisLoop():Promise<void>
 {
     let subscriber = new Redis.RedisClient({});
-    //subscriber.subscribe(ns+":rt:"+queueName);
-    subscriber.on("message", (channel,message) => 
+    //subscriber.subscribe(redisNamespace+":rt:"+queueName);
+    subscriber.on("message", async (channel,message) => 
     {
         console.log("messages unread : ", message);
-        for(let i:number = 0 ; i < parseInt(message); i++)
-        {
-            runProjectionTask();
-        }
+        await runProjectionTask();
     });
 }
 
@@ -114,6 +115,8 @@ export async function fastForwardTaskStore():Promise<void>
     let allOps = await getAllOperations();
     for(let op of allOps)
     {
-        await runPendingOperation(op);
+        let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(op.object);
+        await pushPending(buildPath(opDescriptor.collections, opDescriptor.documents));
+        console.log("pushed op : ", op);
     }
 }

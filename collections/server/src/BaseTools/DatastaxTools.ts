@@ -24,7 +24,7 @@ export async function setup():Promise<void>
   {
       if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
       {
-      return await createKeyspace(config.cassandraKeyspace, config.defaultCassandraKeyspaceOptions);
+      return await createKeyspace(config.cassandraKeyspace, config.defaultCassandraKeyspaceOptions as myTypes.KeyspaceReplicationOptions);
       }
   })
   .then( () => client.connect());

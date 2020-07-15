@@ -1,19 +1,15 @@
-import crypto from "crypto";
-import * as myTypes from "./../BaseTools/myTypes";
 
 //=============== Sentry config ===============
 
-let Sentry = require("@sentry/node");
-if(true){
-   Sentry.init({ dsn: ' /* enter Sentry url here */ ' });
-}
+export const sentry:boolean = false;
+export const sentryDSN:string = "/* enter sentryDSN here */"; 
 
 //=============== Cassandra config ===============
 
 export const cassandraKeyspace:string = "twake_collections";
 export const cassandraContactPoint:string[] = ["127.0.0.1"];
 export const cassandraLocalDatacenter:string = "datacenter1";
-export const defaultCassandraKeyspaceOptions:myTypes.KeyspaceReplicationOptions = 
+export const defaultCassandraKeyspaceOptions = 
 {
     class:"SimpleStrategy",
     replication_factor:3
@@ -26,12 +22,12 @@ export const redisNamespace:string = "twake_collections";
 //=============== Crypto setup ===============
 
 export const cryptoAlgorithm:string = "aes-256-gcm";
-const keyLen:number = 256; //needs to be adapted to the chosen algorithm
-const password:Buffer = Buffer.from("test","utf-8"); //choose another string or buffer of arbitrary size
-const salt:Buffer = Buffer.from(" /* enter a random 16 bytes salt here */ ", "hex");
-export const key = crypto.createSecretKey(crypto.pbkdf2Sync(password, salt, 1000000, keyLen, "sha512"));
+export const keyLen:number = 32; //needs to be adapted to the chosen algorithm (in bytes)
+export const password:string = "0000" //choose another hex buffer of arbitrary size
+export const salt:string = "00000000000000000000000000000000"; //take another random 16 bytes random buffer
+
 
 //=============== TED config ===============
 
-export const taskStoreBatchSize:number = 5;
+export const taskStoreBatchSize:number = 2;
 export const defaultTaskStoreTTL:number = 3600;
