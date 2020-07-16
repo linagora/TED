@@ -2,20 +2,26 @@ import * as CQL from "./../BaseTools/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
 import * as secondary from "../BaseTools/SecondaryOperations";
 import { forwardCollection } from "./StoredTaskHandling";
-
+import { globalCounter } from "./../index";
+import { Timer, RequestTracker } from "./../Monitoring/Timer";
 
 export let EmptyResultError = new Error("No matching object found");
 
-export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<CQL.GetOperation>
+export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<CQL.GetOperation>
 {
+    globalCounter.inc("get precompute");
+    let timer = new Timer("get precompute");
     await forwardCollection(opDescriptor);
+    tracker?.endStep("collection update");
 
     if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new CQL.GetOperation(opDescriptor);
     if(opDescriptor.secondaryInfos === undefined) return new CQL.GetOperation(opDescriptor);
 
     let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
+    tracker?.endStep("secondary table read");
     if(matchingIDs.length === 0) throw EmptyResultError;
     let op = buildGetOperation(opDescriptor, matchingIDs);
+    timer.stop();
     return op;
 }
 

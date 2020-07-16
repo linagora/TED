@@ -2,10 +2,18 @@ import * as myTypes from "./myTypes";
 import crypto from "crypto";
 import { cryptoAlgorithm } from "../Config/config";
 import * as config from "./../Config/config";
+import { globalCounter } from "./../index";
+import { Timer } from "./../Monitoring/Timer";
 
-const password:Buffer = Buffer.from(config.password, "hex");
-const salt:Buffer = Buffer.from(config.salt, "hex");
-export const globalKey = crypto.createSecretKey(crypto.pbkdf2Sync(password, salt, 1000000, config.keyLen, "sha512"));
+
+export let globalKey:crypto.KeyObject;
+export function setup()
+{
+  const password:Buffer = Buffer.from(config.password, "hex");
+  const salt:Buffer = Buffer.from(config.salt, "hex");
+  globalKey = crypto.createSecretKey(crypto.pbkdf2Sync(password, salt, 1000000, config.keyLen, "sha512")); 
+}
+
 
 
 
@@ -41,6 +49,8 @@ export function encryptOperation(operation:myTypes.InternalOperationDescription,
 
 function encryptData(data:myTypes.ServerSideObject, key:crypto.KeyObject):myTypes.EncObject
 {
+  globalCounter.inc("encryption");
+  let timer = new Timer("encryption");
   let iv = crypto.randomBytes(16);
   const cipher:crypto.Cipher = crypto.createCipheriv(cryptoAlgorithm, key, iv);
   let encData:string = cipher.update(JSON.stringify(data), 'utf8', 'hex');
@@ -48,11 +58,14 @@ function encryptData(data:myTypes.ServerSideObject, key:crypto.KeyObject):myType
   let encObject:myTypes.EncObject;
   if(isCipherGCM(cipher)) encObject = {data: encData, iv: iv.toString('base64'), auth: cipher.getAuthTag().toString('base64')};
   else encObject = {data: encData, iv : iv.toString("base64")};
+  timer.stop();
   return encObject;
 }
 
 export function decryptData(encObject:myTypes.EncObject, key:crypto.KeyObject):myTypes.ServerSideObject
 {
+  globalCounter.inc("decryption");
+  let timer = new Timer("decryption");
   if(encObject.iv === undefined) throw new Error("Unable to decrypt data, missing iv");
   if(encObject.auth === undefined) throw new Error("Unable to decrypt data, missing auth");
   const decipher:crypto.Decipher = crypto.createDecipheriv(cryptoAlgorithm, key, Buffer.from(encObject.iv, 'base64'));
@@ -60,6 +73,7 @@ export function decryptData(encObject:myTypes.EncObject, key:crypto.KeyObject):m
   let clearData:string = decipher.update(encObject.data, 'hex', 'utf8');
   clearData += decipher.final('utf8');
   let clearObject:myTypes.ServerSideObject = JSON.parse(clearData);
+  timer.stop();
   return clearObject;
 }
 

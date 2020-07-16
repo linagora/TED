@@ -3,7 +3,8 @@ import * as config from "./../Config/config";
 import * as messageBroker from "./../MessageBroker/MessageBrokerInterface";
 import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
-import Redis from "redis";
+import { globalCounter } from "./../index";
+import { Timer, RequestTracker } from "./../Monitoring/Timer";
 
 export let mbInterface:messageBroker.TaskBroker|null;
 
@@ -64,7 +65,12 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
 async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
 {
     let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
-    await runWriteOperation(opDescriptor);
+    let tracker = new RequestTracker({
+        action: myTypes.action.projection,
+        path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
+    })
+    await runWriteOperation(opDescriptor, tracker);
+    tracker.endStep("cassandra write");
     let rmDescriptor = {...opDescriptor};
     rmDescriptor.keyOverride = {
         path: opLog.path,
@@ -72,6 +78,8 @@ async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
     }
     let removeOperation = new RemoveTaskStore(rmDescriptor);
     await removeOperation.execute();
+    tracker.endStep("taskstore remove");
+    tracker.log();
 }
 
 

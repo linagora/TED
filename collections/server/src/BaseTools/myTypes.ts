@@ -10,6 +10,7 @@ export enum action
   configure = "configure",
   batch = "batch",
   log = "log",
+  projection = "projection"
 };
 
 export enum Operator

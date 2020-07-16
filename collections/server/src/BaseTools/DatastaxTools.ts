@@ -2,7 +2,8 @@ import cassandra from "cassandra-driver";
 import * as myTypes from "./myTypes";
 import { v4 as uuidv4 } from "uuid";
 import * as config from "../Config/config";
-
+import { globalCounter } from "./../index";
+import { Timer, RequestTracker } from "./../Monitoring/Timer";
 
 export const client = new cassandra.Client(
 {
@@ -37,6 +38,8 @@ const defaultQueryOptions:myTypes.QueryOptions = {
 
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
+  globalCounter.inc("single CQL request");
+  let timer = new Timer("single CQL request");
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n   " + JSON.stringify(query) );
   try
@@ -45,17 +48,21 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
     if(options === undefined) options = defaultQueryOptions;
     rs = await client.execute(query.query, query.params, options);
     console.log("   End query ", queryID);
+    timer.stop();
     return processResult(rs);
   }
   catch(err)
   {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
+    timer.stop();
     throw err;
   }
 };
 
-export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
+export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
 {
+  globalCounter.inc("CQL batch");
+  let timer = new Timer("CQL batch");
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
@@ -65,11 +72,16 @@ export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.Query
     if(options === undefined) options = defaultQueryOptions;
     rs = await client.batch(queries, options);
     console.log("   End query ", queryID);
-    return processResult(rs);
+    timer.stop();
+    tracker?.endStep("Batch write");
+    let res = processResult(rs);
+    tracker?.endStep("result computation");
+    return res;
   }
   catch(err)
   {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
+    timer.stop();
     throw err;
   }
 }
