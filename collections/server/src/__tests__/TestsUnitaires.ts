@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import post from 'axios';
 import { writeFile, readFile } from "fs";
 import { getInternalOperationDescription } from "../MacroRoutines/RequestHandling";
+import { monitorEventLoopDelay } from "perf_hooks";
 
 
 function randint(min:number, max:number) { // min and max included 
@@ -127,8 +128,13 @@ export async function writeReadDelRead():Promise<void>
     let path = obj.path;
     console.log(obj);
     await saveObject(obj);
-
+    await delay(1000);
     console.log(await getObject(path));
     await removeObject(path);
     console.log(await getObject(path));
+}
+
+async function delay(ms:number):Promise<void>
+{
+    return new Promise( resolve => setTimeout(resolve, ms) );
 }

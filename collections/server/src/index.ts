@@ -1,9 +1,8 @@
 import * as http from "http";
 import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
-import { RedisLoop, fastForwardTaskStore } from "./MacroRoutines/StoredTaskHandling";
+import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./MacroRoutines/StoredTaskHandling";
 import { setup as cassandraSetup } from "./BaseTools/DatastaxTools";
-import { setup as redisSetup } from "./BaseTools/RedisTools";
 import * as config from "./Config/config";
 
 if(config.sentry === true)
@@ -15,7 +14,7 @@ if(config.sentry === true)
 
 async function setup():Promise<void>
 {
-  await redisSetup();
+  mbSetup();
   await cassandraSetup();
 }
 
@@ -48,7 +47,8 @@ async function main():Promise<void>
 {
   console.log("This is a highway to hell");
   await setup();
-  RedisLoop();
+  if(mbInterface !== null) mbInterface.runTasks();
+  else console.log("Running without task broker");
   await fastForwardTaskStore()
   .catch( (err:myTypes.CQLResponseError) =>
   {
@@ -60,7 +60,7 @@ async function main():Promise<void>
     }
     throw err;
   });
-  
+  console.log("Initializing http server");
   http.createServer(async function(req: any, res: any)
   {
     console.log("\n\n ===== New Incoming Request =====");11

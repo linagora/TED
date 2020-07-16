@@ -45,7 +45,7 @@ export class SaveTaskStore extends CQL.BaseOperation
     protected buildQuery():void
     {
         let tableName:string = this.buildTableName();
-        let params:string[] = [buildPath(this.collections, this.documents.slice(0,-1)), this.opID, this.entry.object];
+        let params:string[] = [buildPath(this.collections, this.documents, true), this.opID, this.entry.object];
         let keys:string = "(path, op_id, object)";
         let placeholders:string = "(?, ?, ?)";
         this.query = {query: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders + " USING TTL " + this.ttl, params: params};
