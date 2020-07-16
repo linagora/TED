@@ -1,9 +1,40 @@
 import * as myTypes from "../BaseTools/myTypes";
-import { peekPending, removePending, queueName, pushPending } from "../BaseTools/RedisTools";
+import * as config from "./../Config/config";
+import * as messageBroker from "./../MessageBroker/MessageBrokerInterface";
 import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
-import { taskStoreBatchSize, redisNamespace } from "../Config/config";
 import Redis from "redis";
+
+export let mbInterface:messageBroker.TaskBroker|null;
+
+export function setup():void
+{
+    switch(config.broker)
+    {
+        case "RabbitMQ":
+        {
+            console.log("Intializing RabbitMQ interface");
+            mbInterface = new messageBroker.RabbitMQBroker(config.amqpURL, config.amqpQueueName, projectTask, config.amqpQueueOptions, config.amqpMessageOptions);
+            break;
+        }
+        default:
+        {
+            console.log("No valid broker detected in config file");
+            mbInterface = null;
+            break;
+        }
+    }
+  
+}
+
+export async function projectTask(path:string):Promise<void>
+{
+    let operations = await getPendingOperations(path);
+    for(let op of operations)
+    {
+        await runPendingOperation(op);
+    }
+}
 
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
 {
@@ -22,7 +53,7 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
         },
         options: {
             order: "op_id ASC",
-            limit: taskStoreBatchSize
+            limit: config.taskStoreBatchSize
         }
     })
     let result = await getOperation.execute();
@@ -43,32 +74,10 @@ async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
     await removeOperation.execute();
 }
 
-async function runProjectionTask():Promise<void>
-{
-    let message = await peekPending();
-    if(message === null) 
-    {
-        return;
-    }
-    try
-    {
-        let operations:myTypes.DBentry[] = await getPendingOperations(message.message);
-        console.log(operations.length + " pending operations found\n==================");
-        for(let op of operations)
-        {
-            await runPendingOperation(op);
-        }
-        await removePending(message.id);
-    }
-    catch(err)
-    {
-        console.log("failed to run operation : " + err)
-    }
-}
 
 export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    let path:string = buildPath(opDescriptor.collections, opDescriptor.documents.slice(0,opDescriptor.collections.length - 1));
+    let path:string = buildPath(opDescriptor.collections, opDescriptor.documents, true);
     console.log("collection to forward", path);
     let operationsToForward:myTypes.DBentry[]
     do
@@ -78,18 +87,7 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
         {
             await runPendingOperation(op);
         }
-    }while(operationsToForward.length == taskStoreBatchSize )    
-}
-
-export async function RedisLoop():Promise<void>
-{
-    let subscriber = new Redis.RedisClient({});
-    //subscriber.subscribe(redisNamespace+":rt:"+queueName);
-    subscriber.on("message", async (channel,message) => 
-    {
-        console.log("messages unread : ", message);
-        await runProjectionTask();
-    });
+    }while(operationsToForward.length == config.taskStoreBatchSize )    
 }
 
 async function getAllOperations():Promise<myTypes.DBentry[]>
@@ -113,10 +111,16 @@ async function getAllOperations():Promise<myTypes.DBentry[]>
 export async function fastForwardTaskStore():Promise<void>
 {
     let allOps = await getAllOperations();
+    if(mbInterface === null)
+    {
+        console.log("Unable to fastforward operations without task broker. Operations will be executed on read.");
+        return;
+    }
     for(let op of allOps)
     {
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(op.object);
-        await pushPending(buildPath(opDescriptor.collections, opDescriptor.documents));
-        console.log("pushed op : ", op);
+        let path = buildPath(opDescriptor.collections, opDescriptor.documents, true)
+        await mbInterface.pushTask(path);
+        console.log("pushed op : ", path);
     }
 }

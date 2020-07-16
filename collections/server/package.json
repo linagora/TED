@@ -20,8 +20,10 @@
   },
   "dependencies": {
     "@sentry/node": "5.19.1",
+    "@types/amqplib": "^0.5.13",
     "@types/deep-equal": "^1.0.1",
     "@types/uuid": "^8.0.0",
+    "amqplib": "^0.6.0",
     "axios": "^0.19.2",
     "cassandra-driver": "^4.5.2",
     "crypto": "^1.0.1",

@@ -4,7 +4,7 @@ import { promisify } from "util";
 import * as config from "../Config/config";
 
 
-export const queueName = "projection-tasks";
+/* export const queueName = "projection-tasks";
 export const rsmq = new RedisSMQ({ns : config.redisNamespace, realtime: true});
 
 export const createQueuePromise = promisify(rsmq.createQueue);
@@ -58,4 +58,4 @@ export async function removePending(id:string):Promise<void>
 {
     await deleteMessagePromise( {qname : queueName, id: id});
     return;
-}
+} */

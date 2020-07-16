@@ -4,9 +4,9 @@ import removeRoutine from "./RemoveRoutine";
 import getRoutine from "./GetRoutine";
 import * as OperationLog from "./../BaseTools/OperationsTable";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
-import { pushPending } from "../BaseTools/RedisTools";
 import { SaveTaskStore } from "./../BaseTools/TaskStore";
 import { BatchOperation } from "../BaseTools/BaseOperations";
+import { mbInterface } from "./StoredTaskHandling";
 import { v1 as uuidv1 } from "uuid";
 
 
@@ -35,17 +35,25 @@ export function processPath(path:string):{documents:string[], collections:string
     return {documents:documents, collections:collections};
 }
 
-export function buildPath(collections:string[], documents:string[]):string
+export function buildPath(collections:string[], documents:string[], truncate:boolean):string
 {
     if(collections.length - documents.length > 1 || collections.length - documents.length < 0) throw new Error("Invalid documents[] and collections[] length");
-    let path = "";
-    for(let i:number = 0; i <documents.length; i++)
+    let res:string[] = [];
+    for(let i:number = 0; i < documents.length; i++)
     {
-        path = path + collections[i] + "/" + documents[i] + "/";
+        res.push(collections[i]);
+        res.push(documents[i]);
     }
-    if(collections.length - documents.length === 1) path = path + collections.slice(-1)[0];
-    else path = path.slice(0,-1);
-    return path;
+    if(collections.length - documents.length === 1) res.push(collections.slice(-1)[0]);
+    else if(truncate) res.pop();
+    return res.join("/");
+}
+
+export function truncatePath(path:string):string
+{
+    let list:string[] = path.split("/");
+    if(list.length % 2 === 0 ) list = list.slice(0,-1);
+    return list.join("/");
 }
 
 export async function createOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.Operation>
@@ -117,7 +125,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, )
         {
             let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)]);
             await opWrite.execute();
-            await pushPending(request.path);
+            if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path));
             return {status: "Success"};
         }
         case myTypes.action.get:
