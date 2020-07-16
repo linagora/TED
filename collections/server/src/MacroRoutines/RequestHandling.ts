@@ -8,6 +8,8 @@ import { SaveTaskStore } from "./../BaseTools/TaskStore";
 import { BatchOperation } from "../BaseTools/BaseOperations";
 import { mbInterface } from "./StoredTaskHandling";
 import { v1 as uuidv1 } from "uuid";
+import { Timer, RequestTracker } from "./../Monitoring/Timer";
+
 
 
 export function processPath(path:string):{documents:string[], collections:string[]}
@@ -114,24 +116,36 @@ export function getInternalOperationDescription(request:myTypes.ServerBaseReques
     return opDescriptor;
 }
 
-export default async function handleRequest(request:myTypes.ServerBaseRequest, ):Promise<myTypes.ServerAnswer>
+async function delay(ms:number):Promise<void>
+{
+    return new Promise( resolve => setTimeout(resolve, ms) );
+}
+
+export default async function handleRequest(request:myTypes.ServerBaseRequest, tracker?:RequestTracker ):Promise<myTypes.ServerAnswer>
 {
     let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request);
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
+    tracker?.endStep("encryption");
     switch(opDescriptor.action)
     {
         case myTypes.action.save:
         case myTypes.action.remove:
         {
-            let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)]);
+            let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)], tracker);
+            tracker?.endStep("TaskStore operation computation")
             await opWrite.execute();
             if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path));
+            tracker?.endStep("rabbitmq write");
+            tracker?.log();
             return {status: "Success"};
         }
         case myTypes.action.get:
         {
-            let res = await runReadOperation(opDescriptor);
+            let res = await runReadOperation(opDescriptor, tracker);
+            tracker?.endStep("cassandra read")
             myCrypto.decryptResult(res, myCrypto.globalKey);
+            tracker?.endStep("decryption");
+            tracker?.log()
             return res;
         }
         default:
@@ -141,18 +155,22 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, )
     }    
 }
 
-export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
 {
     switch(opDescriptor.action)
     {
         case myTypes.action.save:
         {
-            await (await saveRoutine(opDescriptor)).execute();
+            let op = await saveRoutine(opDescriptor, tracker);
+            tracker?.endStep("operation computation")
+            await op.execute();
             break;
         }
         case myTypes.action.remove:
         {
-            await (await removeRoutine(opDescriptor)).execute();
+            let op = await removeRoutine(opDescriptor, tracker);
+            tracker?.endStep("operation computation")
+            await op.execute();
             break;
         }
         default:
@@ -162,8 +180,11 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
     }
 }
 
-async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.ServerAnswer>
+async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
 {
     if(opDescriptor.action !== myTypes.action.get) throw new Error("This is not an authorized read operation");
-    return (await getRoutine(opDescriptor)).execute()
+    let op = await getRoutine(opDescriptor, tracker);
+    tracker?.endStep("operation construction");
+    let res = await op.execute();
+    return res;
 }

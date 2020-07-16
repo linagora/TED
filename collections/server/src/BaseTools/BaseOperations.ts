@@ -2,6 +2,9 @@ import * as myTypes from "./myTypes";
 import * as datastaxTools from "./DatastaxTools";
 import { TStoCQLtypes } from "./SecondaryOperations";
 import { TaskTable } from "./AntiDuplicata";
+import { globalCounter } from "./../index";
+import { Timer, RequestTracker } from "./../Monitoring/Timer";
+import { tracker } from "cassandra-driver";
 
 let runningTableCreation = new TaskTable();
 
@@ -123,9 +126,17 @@ export class SaveOperation extends BaseOperation
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
+    globalCounter.inc("CQL save");
+    let timer = new Timer("CQL save");
     return await super.execute()
+    .then( (result) => 
+    {
+      timer.stop();
+      return result;
+    })
     .catch(async (err:myTypes.CQLResponseError) =>
     {
+      timer.stop();
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
         this.tableCreationFlag = true;
@@ -212,6 +223,15 @@ export class GetOperation extends BaseOperation
     this.buildQuery();
   }
 
+  public async execute():Promise<myTypes.ServerAnswer>
+  {
+    globalCounter.inc("CQL get");
+    let timer = new Timer("CQL get");
+    let res = await super.execute();
+    timer.stop();
+    return res;
+  }
+
   protected buildQuery():void
   {
     let tableName:string = this.buildTableName();
@@ -247,6 +267,15 @@ export class RemoveOperation extends BaseOperation
     this.buildQuery();
   }
 
+  public async execute():Promise<myTypes.ServerAnswer>
+  {
+    globalCounter.inc("CQL remove");
+    let timer = new Timer("CQL remove");
+    let res = await super.execute();
+    timer.stop();
+    return res;
+  }
+
   protected buildQuery():void
   {
     let tableName:string = this.buildTableName();
@@ -266,15 +295,17 @@ export class BatchOperation implements myTypes.Operation
   operations:BaseOperation[];
   queries:myTypes.Query[] | null;
 
+  tracker?:RequestTracker;
   options?:myTypes.QueryOptions;
 
   tableCreationFlag:boolean = false;
   tableOptions?:myTypes.TableOptions;
 
-  constructor(batch:BaseOperation[])
+  constructor(batch:BaseOperation[], tracker?:RequestTracker)
   {
     this.action = myTypes.action.batch;
     this.operations = batch;
+    this.tracker = tracker;
     for(let op of this.operations)
     {
       if(op.action === myTypes.action.batch || op.action === myTypes.action.get) throw new Error("Batch cannot contain batch or get operations");
@@ -286,16 +317,19 @@ export class BatchOperation implements myTypes.Operation
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
-    return await datastaxTools.runBatchDB(this.queries)
+    let res = await datastaxTools.runBatchDB(this.queries, undefined, this.tracker)
     .catch(async (err:myTypes.CQLResponseError) =>
     {
+      this.tracker?.endStep("first attempt");
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
         await this.createTable(err.message);
+        this.tracker?.endStep("table creation");
         return await this.execute();
       }
       return {status: "error", error: err};
     });
+    return res;
   }
 
   public push(operation:BaseOperation)
@@ -359,6 +393,7 @@ export async function createTable(tableDefinition:myTypes.TableDefinition):Promi
 
 export async function createTableRetry(tableDefinition:myTypes.TableDefinition):Promise<void>
 {
+  let tableTimer = new Timer("table creation");
   let query = createTableQuery(tableDefinition);
   await datastaxTools.runDB(query)
   .catch( async (err) => 
@@ -381,13 +416,14 @@ export async function createTableRetry(tableDefinition:myTypes.TableDefinition):
     await delay(10000);
     await datastaxTools.runDB(query);
   });
-
+  tableTimer.stop();
   //Add tableOtions
   //TODO
 }
 
 function createTableQuery(tableDefinition:myTypes.TableDefinition):myTypes.Query
 {
+  globalCounter.inc("tables ceated");
   let res = "CREATE TABLE IF NOT EXISTS " + tableDefinition.name + " (";
   let primaryKey:string = "(";
   for(let i:number = 0; i<tableDefinition.keys.length; i++)

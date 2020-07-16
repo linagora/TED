@@ -1,8 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import post from 'axios';
 import { writeFile, readFile } from "fs";
-import { getInternalOperationDescription } from "../MacroRoutines/RequestHandling";
-import { monitorEventLoopDelay } from "perf_hooks";
 
 
 function randint(min:number, max:number) { // min and max included 
@@ -28,7 +26,9 @@ let names:string[] = ["a", "b"];
 
 type DBObject = {
     path:string;
-    object:Object;
+    object: {
+        [key: string]: any
+    };
 };
 
 export function randomObject():DBObject
@@ -41,20 +41,12 @@ export function randomObject():DBObject
         pathElem.push(uuidv4());
     }
     let path:string = pathElem.join("/");
-    let param:number = randint(0,3);
-    switch(param)
-    {
-        case 0:
-            return  {path: path, object: {}};
-        case 1:
-            return  {path: path, object: {testa: randint(0,10)}};
-        case 2:
-            return  {path: path, object: {testb: randint(0,10)}};
-        case 3:
-            return  {path: path, object: {testa: randint(0,10), testb: randint(0,10)}};
-        default:
-            return {path:path, object:{}};
+    let param:number = randint(5,15);
+    let obj: DBObject = {path: path, object: {}};
+    for (let i: number = 0; i<param; i++){
+        obj.object["test"+i] = randint(0, 10);
     }
+    return obj;
 }
 
 export async function saveObject(obj:DBObject):Promise<void>
