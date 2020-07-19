@@ -19,6 +19,17 @@ export const defaultCassandraKeyspaceOptions =
 
 export const redisNamespace:string = "twake_collections";
 
+//=============== RabbitMQ config ===============
+
+export const amqpQueueName:string = "projection_tasks";
+export const amqpURL:string = "amqp://localhost";
+export const amqpQueueOptions = {
+    durable:  true
+};
+export const amqpMessageOptions = {
+    persistent: true
+}
+
 //=============== Crypto setup ===============
 
 export const cryptoAlgorithm:string = "aes-256-gcm";
@@ -29,5 +40,6 @@ export const salt:string = "00000000000000000000000000000000"; //take another ra
 
 //=============== TED config ===============
 
-export const taskStoreBatchSize:number = 2;
+export const taskStoreBatchSize:number = 1;
 export const defaultTaskStoreTTL:number = 3600;
+export const broker:string = "RabbitMQ";
