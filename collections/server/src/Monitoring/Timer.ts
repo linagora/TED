@@ -1,5 +1,6 @@
 import { writeFile, readFile } from "fs"
 import { ServerBaseRequest } from "../BaseTools/myTypes";
+import * as client from "prom-client";
 
 type LogMap = {
     [key:string]:number[];

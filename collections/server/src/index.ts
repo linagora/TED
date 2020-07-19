@@ -3,10 +3,12 @@ import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
 import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./MacroRoutines/StoredTaskHandling";
 import { setup as cryptoSetup } from "./BaseTools/CryptographicTools";
-import { setup as cassandraSetup } from "./BaseTools/DatastaxTools";
+import { setup as cassandraSetup} from "./BaseTools/DatastaxTools";
 import { TimerLogsMap, Timer, RequestTracker, RequestTrackerLog } from "./Monitoring/Timer";
 import { CounterMap } from "./Monitoring/Counter";
+import { setup as promSetup } from "./Monitoring/PrometheusClient";
 import * as config from "./Config/config";
+import * as promClient from "prom-client";
 
 export let globalTimerLogs:TimerLogsMap;
 export let globalCounter:CounterMap;
@@ -26,10 +28,11 @@ async function setup():Promise<void>
   globalCounter = new CounterMap();
   mbSetup();
   cryptoSetup();
+  promSetup();
   await cassandraSetup();
 }
 
-async function getHTTPBody(req:any):Promise<myTypes.ServerBaseRequest>
+async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerBaseRequest>
 {
   return new Promise((resolve, reject) => 
   {
@@ -73,15 +76,20 @@ async function main():Promise<void>
   });
 
   console.log("Initializing http server");
-  http.createServer(async function(req: any, res: any)
+  http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
   {
     console.log("\n\n ===== New Incoming Request =====");
+    if(req.url === "/metrics")
+    {
+      res.end(promClient.register.metrics());
+      return;
+    }
     let httpTimer = new Timer("http response");
-    let body_str:myTypes.ServerBaseRequest = await getHTTPBody(req);
-    let tracker = new RequestTracker(body_str);
+    let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
+    let tracker = new RequestTracker(operation);
     try
     {
-      let answer = await handleRequest(body_str, tracker);
+      let answer = await handleRequest(operation, tracker);
       res.write(JSON.stringify(answer));
       res.end();
     }
