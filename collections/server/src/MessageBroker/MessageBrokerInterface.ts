@@ -56,11 +56,16 @@ export class RabbitMQBroker extends TaskBroker
             this.channel.consume(this.queueName, async (msg) => 
             {
                 if(msg === null) throw new Error("Received null from amqp");
-                console.log("New task : ",msg.content.toString("utf-8"));
-                await this.callback(msg.content.toString("utf-8"));
-                if(this.channel === undefined) throw new Error("WTF ???");
-                console.log("End of task : ", msg.content.toString("utf-8"));
-                this.channel.ack(msg);
+                try{
+                    console.log("New task : ",msg.content.toString("utf-8"));
+                    await this.callback(msg.content.toString("utf-8"));
+                    console.log("End of task : ", msg.content.toString("utf-8"));
+                    this.channel?.ack(msg);
+                }
+                catch(err){
+                    this.channel?.reject(msg);
+                }
+                
             }, {noAck: false}); 
         }
         catch(err)
