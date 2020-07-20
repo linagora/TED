@@ -9,16 +9,16 @@ export let EmptyResultError = new Error("No matching object found");
 
 export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<CQL.GetOperation>
 {
-    globalCounter.inc("get precompute");
-    let timer = new Timer("get precompute");
+    globalCounter.inc("get_precompute");
+    let timer = new Timer("get_precompute");
     await forwardCollection(opDescriptor);
-    tracker?.endStep("collection update");
+    tracker?.endStep("collection_update");
 
     if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new CQL.GetOperation(opDescriptor);
     if(opDescriptor.secondaryInfos === undefined) return new CQL.GetOperation(opDescriptor);
 
     let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
-    tracker?.endStep("secondary table read");
+    tracker?.endStep("secondary_table_read");
     if(matchingIDs.length === 0) throw EmptyResultError;
     let op = buildGetOperation(opDescriptor, matchingIDs);
     timer.stop();

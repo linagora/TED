@@ -7,14 +7,14 @@ import { Timer, RequestTracker } from "./../Monitoring/Timer";
 
 export default async function removeRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<CQL.BatchOperation>
 {
-    globalCounter.inc("remove precompute");
-    let timer = new Timer("remove precompute");
+    globalCounter.inc("remove_precompute");
+    let timer = new Timer("remove_precompute");
     let opArray:CQL.BaseOperation[] = [];
     if(opDescriptor.collections.length === opDescriptor.documents.length)
     {
         opArray.push(new CQL.RemoveOperation(opDescriptor));
         let previousValueEnc = await secondary.getPreviousValue(opDescriptor);
-        tracker?.endStep("secondary table read");
+        tracker?.endStep("secondary_table_read");
         if(previousValueEnc === null) return new CQL.BatchOperation([]);
         let previousValue:myTypes.ServerSideObject = myCrypto.decryptData(previousValueEnc, myCrypto.globalKey);
         Object.entries(previousValue).forEach( ([key, value]) =>

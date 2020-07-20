@@ -126,8 +126,8 @@ export class SaveOperation extends BaseOperation
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
-    globalCounter.inc("CQL save");
-    let timer = new Timer("CQL save");
+    globalCounter.inc("cql_save");
+    let timer = new Timer("cql_save");
     return await super.execute()
     .then( (result) => 
     {
@@ -225,8 +225,8 @@ export class GetOperation extends BaseOperation
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
-    globalCounter.inc("CQL get");
-    let timer = new Timer("CQL get");
+    globalCounter.inc("cql_get");
+    let timer = new Timer("cql_get");
     let res = await super.execute();
     timer.stop();
     return res;
@@ -269,8 +269,8 @@ export class RemoveOperation extends BaseOperation
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
-    globalCounter.inc("CQL remove");
-    let timer = new Timer("CQL remove");
+    globalCounter.inc("cql_remove");
+    let timer = new Timer("cql_remove");
     let res = await super.execute();
     timer.stop();
     return res;
@@ -320,11 +320,11 @@ export class BatchOperation implements myTypes.Operation
     let res = await datastaxTools.runBatchDB(this.queries, undefined, this.tracker)
     .catch(async (err:myTypes.CQLResponseError) =>
     {
-      this.tracker?.endStep("first attempt");
+      this.tracker?.endStep("first_attempt");
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
         await this.createTable(err.message);
-        this.tracker?.endStep("table creation");
+        this.tracker?.endStep("table_creation");
         return await this.execute();
       }
       return {status: "error", error: err};
@@ -379,21 +379,28 @@ export class BatchOperation implements myTypes.Operation
 
 export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
 {
-  if(runningTableCreation.isDone(tableDefinition.name)) return;
-  if(runningTableCreation.isRunning(tableDefinition.name))
-  {
-    console.log("Waiting for creation of table ", tableDefinition.name);
-    await runningTableCreation.waitTask(tableDefinition.name);
-    return;
+  try{
+    if(runningTableCreation.isDone(tableDefinition.name)) return;
+    if(runningTableCreation.isRunning(tableDefinition.name))
+    {
+      console.log("Waiting for creation of table ", tableDefinition.name);
+      await runningTableCreation.waitTask(tableDefinition.name);
+      return;
+    }
+    await runningTableCreation.pushTask(tableDefinition.name);
+    await createTableRetry(tableDefinition);
+    runningTableCreation.endTask(tableDefinition.name);
   }
-  runningTableCreation.pushTask(tableDefinition.name);
-  await createTableRetry(tableDefinition);
-  runningTableCreation.endTask(tableDefinition.name);
+  catch(err){
+    runningTableCreation.failTask(tableDefinition.name);
+    throw err;
+  }
+
 }
 
 export async function createTableRetry(tableDefinition:myTypes.TableDefinition):Promise<void>
 {
-  let tableTimer = new Timer("table creation");
+  let tableTimer = new Timer("table_creation");
   let query = createTableQuery(tableDefinition);
   await datastaxTools.runDB(query)
   .catch( async (err) => 
@@ -423,7 +430,7 @@ export async function createTableRetry(tableDefinition:myTypes.TableDefinition):
 
 function createTableQuery(tableDefinition:myTypes.TableDefinition):myTypes.Query
 {
-  globalCounter.inc("tables ceated");
+  globalCounter.inc("tables_ceated");
   let res = "CREATE TABLE IF NOT EXISTS " + tableDefinition.name + " (";
   let primaryKey:string = "(";
   for(let i:number = 0; i<tableDefinition.keys.length; i++)

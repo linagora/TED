@@ -131,18 +131,19 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
         case myTypes.action.save:
         case myTypes.action.remove:
         {
+            tracker?.updateLabel("taskstore_write")
             let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)], tracker);
-            tracker?.endStep("TaskStore operation computation")
+            tracker?.endStep("taskstore_operation_computation")
             await opWrite.execute();
             if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path));
-            tracker?.endStep("rabbitmq write");
+            tracker?.endStep("rabbitmq_write");
             tracker?.log();
             return {status: "Success"};
         }
         case myTypes.action.get:
         {
             let res = await runReadOperation(opDescriptor, tracker);
-            tracker?.endStep("cassandra read")
+            tracker?.endStep("cassandra_read")
             myCrypto.decryptResult(res, myCrypto.globalKey);
             tracker?.endStep("decryption");
             tracker?.log()
@@ -161,15 +162,17 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
     {
         case myTypes.action.save:
         {
+            tracker?.updateLabel("save_operation");
             let op = await saveRoutine(opDescriptor, tracker);
-            tracker?.endStep("operation computation")
+            tracker?.endStep("operation_computation")
             await op.execute();
             break;
         }
         case myTypes.action.remove:
         {
+            tracker?.updateLabel("remove_operation");
             let op = await removeRoutine(opDescriptor, tracker);
-            tracker?.endStep("operation computation")
+            tracker?.endStep("operation_computation")
             await op.execute();
             break;
         }
@@ -183,8 +186,9 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
 async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
 {
     if(opDescriptor.action !== myTypes.action.get) throw new Error("This is not an authorized read operation");
+    tracker?.updateLabel("get_operation");
     let op = await getRoutine(opDescriptor, tracker);
-    tracker?.endStep("operation construction");
+    tracker?.endStep("operation_computation");
     let res = await op.execute();
     return res;
 }

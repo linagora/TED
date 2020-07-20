@@ -68,9 +68,9 @@ async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
     let tracker = new RequestTracker({
         action: myTypes.action.projection,
         path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
-    })
+    }, "projection");
     await runWriteOperation(opDescriptor, tracker);
-    tracker.endStep("cassandra write");
+    tracker.endStep("cassandra_write");
     let rmDescriptor = {...opDescriptor};
     rmDescriptor.keyOverride = {
         path: opLog.path,
@@ -78,7 +78,7 @@ async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
     }
     let removeOperation = new RemoveTaskStore(rmDescriptor);
     await removeOperation.execute();
-    tracker.endStep("taskstore remove");
+    tracker.endStep("taskstore_remove");
     tracker.log();
 }
 

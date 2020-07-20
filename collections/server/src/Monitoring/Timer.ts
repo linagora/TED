@@ -1,9 +1,17 @@
 import { writeFile, readFile } from "fs"
 import { ServerBaseRequest } from "../BaseTools/myTypes";
-import * as client from "prom-client";
+import * as prometheus from "prom-client";
 
 type LogMap = {
     [key:string]:number[];
+}
+
+type promHistMap = {
+    [key:string]:prometheus.Histogram<string>;
+}
+
+type promSumMap = {
+    [key:string]:prometheus.Summary<string>;
 }
 
 type TimeTracker = {
@@ -17,11 +25,13 @@ type TimeTrackerLog = {
 export class TimerLogsMap
 {
     logs:LogMap;
+    prom_logs:promHistMap;
 
     constructor()
     {
         this.logs = {};
-        readFile("src/Monitoring/timers.json", "utf8", (err, data) => 
+        this.prom_logs = {};
+        readFile("src/Monitoring/logs/timers.json", "utf8", (err, data) => 
         {
             if(err) return err;
             this.logs = JSON.parse(data);
@@ -30,12 +40,18 @@ export class TimerLogsMap
 
     public addTimeLog(key:string, time:number):void
     {
-        if(this.logs[key] === undefined)
+        if(this.logs[key] === undefined || this.prom_logs[key] === undefined)
         {
+            console.log(key);
             this.logs[key] = [];
+            this.prom_logs[key] = new prometheus.Histogram({
+                name: "custom_histogram_" + key,
+                help: "a custom timer histogram related to " + key
+            });
         }
         this.logs[key].push(time);
-        writeFile("src/Monitoring/timer.json", JSON.stringify(this.logs), "utf8", ()=>{});
+        this.prom_logs[key].observe(time);
+        writeFile("src/Monitoring/logs/timer.json", JSON.stringify(this.logs), "utf8", ()=>{});
     }
 }
 
@@ -62,11 +78,13 @@ export class Timer
 export class RequestTrackerLog
 {
     logs:TimeTrackerLog;
+    prom_logs:promSumMap;
 
     constructor()
     {
         this.logs = {};
-        readFile("src/Monitoring/request_tracker.json", "utf8", (err, data) => 
+        this.prom_logs = {};
+        readFile("src/Monitoring/logs/request_tracker.json", "utf8", (err, data) => 
         {
             if(err) return err;
             this.logs = JSON.parse(data);
@@ -75,28 +93,43 @@ export class RequestTrackerLog
 
     public addTracker(tracker:RequestTracker):void
     {
-        let key:string = tracker.operation.action;
-        if(this.logs[key] === undefined)
+        let label:string = tracker.label;
+        if(this.logs[label] === undefined)
         {
-            this.logs[key] = [];
+            this.logs[label] = [];
         }
-        this.logs[key].push(tracker.logs);
-        writeFile("src/Monitoring/request_tracker.json", JSON.stringify(this.logs), "utf8", ()=>{});
+        Object.entries(tracker.logs).forEach(([key, value]) => 
+        {
+            console.log(key, value);
+            if(this.prom_logs[key] === undefined)
+            {
+                this.prom_logs[key] = new prometheus.Summary({
+                    name: "custom_summary_tracker" + key,
+                    help: "a custom summary to record the time of " +  key,
+                    labelNames: ["operation_description"]
+                })
+            }
+            this.prom_logs[key].observe({operation_description: label}, value);
+        })
+        this.logs[label].push(tracker.logs);
+        writeFile("src/Monitoring/logs/request_tracker.json", JSON.stringify(this.logs), "utf8", ()=>{});
     }
 }
 
 export class RequestTracker
 {
     logs:TimeTracker;
+    label:string;
     operation:ServerBaseRequest;
     last:number;
     static logMap:RequestTrackerLog;
 
-    constructor(operation:ServerBaseRequest)
+    constructor(operation:ServerBaseRequest, label:string)
     {
         this.logs = {};
         this.last = new Date().getTime();
         this.operation = operation;
+        this.label = label;
     }
 
     public endStep(step:string):void
@@ -109,5 +142,10 @@ export class RequestTracker
     public log():void
     {
         RequestTracker.logMap.addTracker(this);
+    }
+
+    public updateLabel(label:string):void
+    {
+        this.label += "_" + label;
     }
 }
