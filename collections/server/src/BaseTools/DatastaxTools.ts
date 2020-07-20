@@ -38,8 +38,8 @@ const defaultQueryOptions:myTypes.QueryOptions = {
 
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
-  globalCounter.inc("single CQL request");
-  let timer = new Timer("single CQL request");
+  globalCounter.inc("single_cql_request");
+  let timer = new Timer("single_cql_request");
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n   " + JSON.stringify(query) );
   try
@@ -61,8 +61,8 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
 
 export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
 {
-  globalCounter.inc("CQL batch");
-  let timer = new Timer("CQL batch");
+  globalCounter.inc("cql_batch");
+  let timer = new Timer("cql_batch");
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
@@ -73,9 +73,9 @@ export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.Query
     rs = await client.batch(queries, options);
     console.log("   End query ", queryID);
     timer.stop();
-    tracker?.endStep("Batch write");
+    tracker?.endStep("batch_write");
     let res = processResult(rs);
-    tracker?.endStep("result computation");
+    tracker?.endStep("result_computation");
     return res;
   }
   catch(err)

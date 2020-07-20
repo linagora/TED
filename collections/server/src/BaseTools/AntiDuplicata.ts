@@ -1,4 +1,4 @@
-import { table } from "console";
+import { maxTableCreation } from "./../Config/config";
 
 type StateTable = {
     [key:string]:Boolean
@@ -21,13 +21,18 @@ export class TaskTable
 {
     taskState:StateTable;
     promiseTable:PromiseTable;
-    resolver:ResolverTable
+    resolver:ResolverTable;
+    taskCounter:number;
+    lock:ExternalResolver[];
+    
 
     constructor()
     {
         this.taskState = {};
         this.resolver = {};
         this.promiseTable = {};
+        this.taskCounter = 0;
+        this.lock = [];
     }
 
     public isDone(task:string):boolean
@@ -42,8 +47,9 @@ export class TaskTable
         return true;
     }
 
-    public pushTask(task:string):void
+    public async pushTask(task:string):Promise<void>
     {
+        
         if(! ( this.isRunning(task) || this.isDone(task)))
         {
             this.taskState[task] = true;
@@ -55,6 +61,10 @@ export class TaskTable
             })
             this.promiseTable[task] = promise;
             this.resolver[task] = promiseExt;
+
+            console.log(this.taskCounter, " running table creations");
+            await this.delayer();
+            this.taskCounter++;
             return;
         }
         throw new Error("Task already running");
@@ -67,7 +77,30 @@ export class TaskTable
 
     public endTask(task:string):void
     {
+        this.taskCounter--;
         this.taskState[task] = false;
         this.resolver[task].res();
+        this.lock.map((promise)=>promise.res());
+    }
+
+    public failTask(task:string):void
+    {
+        this.taskCounter--;
+        this.taskState[task] = false;
+        this.resolver[task].rej();
+        this.lock.map((promise)=>promise.rej());
+    }
+
+    private async delayer():Promise<void>
+    {
+        if(this.taskCounter < maxTableCreation) return;
+        let promiseExt:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
+        let lockPromise = new Promise(function (resolve, reject):void
+        {
+            promiseExt.res = resolve;
+            promiseExt.rej = reject;
+        });
+        this.lock.push(promiseExt);
+        await lockPromise;
     }
 }

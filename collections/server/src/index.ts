@@ -59,7 +59,7 @@ async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerBaseR
 async function main():Promise<void>
 {
   console.log("This is a highway to hell");
-  let initTimer = new Timer("program init");
+  let initTimer = new Timer("program_init");
   await setup();
   if(mbInterface !== null) mbInterface.runTasks();
   else console.log("Running without task broker");
@@ -84,9 +84,9 @@ async function main():Promise<void>
       res.end(promClient.register.metrics());
       return;
     }
-    let httpTimer = new Timer("http response");
+    let httpTimer = new Timer("http_response");
     let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
-    let tracker = new RequestTracker(operation);
+    let tracker = new RequestTracker(operation, "");
     try
     {
       let answer = await handleRequest(operation, tracker);
