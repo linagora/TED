@@ -4,3 +4,4 @@ coverage
 yarn-error.log
 src/Config/config.ts
 src/Monitoring/logs/
+src/__tests__/DBState.json
