@@ -18,6 +18,11 @@ export function setup():void
             mbInterface = new messageBroker.RabbitMQBroker(config.amqpURL, config.amqpQueueName, projectTask, config.amqpQueueOptions, config.amqpMessageOptions);
             break;
         }
+        case "SQS":
+        {
+            console.log("Intializing SQS interface");
+            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqsQueueOptions, config.sqsMessageOptions);
+        }
         default:
         {
             console.log("No valid broker detected in config file");
