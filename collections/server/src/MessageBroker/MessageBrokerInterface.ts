@@ -1,5 +1,8 @@
 import * as amqp from "amqplib";
-import { connect } from "http2";
+import { SQS } from "aws-sdk";
+import {sqsRegion, sqsAccessID, sqsAccessKey } from "./../Config/config";
+import { UdpContainerSettings } from "aws-sdk/clients/medialive";
+import { promisify } from "util";
 
 type ExternalResolver = {
     res:() => void,
@@ -8,15 +11,15 @@ type ExternalResolver = {
 
 export abstract class TaskBroker
 {
-    queueName:string;
     queueOptions?:Object;
     messageOptions?:Object;
+    callback:(path:string)=>Promise<void>;
 
-    constructor(queueName:string, queueOptions?:Object, messageOptions?:Object)
+    constructor(callback:(path:string)=>Promise<void>, queueOptions?:Object, messageOptions?:Object)
     {
-        this.queueName = queueName;
         this.queueOptions = queueOptions;
         this.messageOptions = messageOptions;
+        this.callback = callback;
     }
 
     public abstract async pushTask(task:string):Promise<void>;
@@ -25,19 +28,19 @@ export abstract class TaskBroker
 
 export class RabbitMQBroker extends TaskBroker
 {
+    queueName:string;
     amqpURL:string;
     channel?:amqp.Channel;
     connectionHandling:boolean;
-    callback:(path:string)=>Promise<void>;
-
+    
     delayerResolver?:ExternalResolver;
     delayerPromise?:Promise<unknown>;
 
     constructor(amqpURL:string, queueName:string, callback:(path:string)=>Promise<void>, queueOptions:Object, messageOptions:Object)
     {
-        super(queueName, queueOptions, messageOptions);
+        super(callback, queueOptions, messageOptions);
+        this.queueName = queueName;
         this.amqpURL = amqpURL;
-        this.callback = callback;
         this.connectionHandling = false;
     }
 
@@ -45,25 +48,7 @@ export class RabbitMQBroker extends TaskBroker
     {
         if(this.channel === undefined)
         {
-            if(!this.connectionHandling)
-            {
-                this.connectionHandling = true;
-                let delayer:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
-                this.delayerPromise = new Promise(function (resolve, reject):void {
-                    delayer.res = resolve;
-                    delayer.rej = reject;
-                });
-                this.delayerResolver = delayer;
-    
-                let conn = await amqp.connect(this.amqpURL);
-                this.channel = await conn.createChannel();
-    
-                this.delayerResolver.res();
-            }
-            if(this.connectionHandling)
-            {
-                await this.delayerPromise;
-            }
+            await this.createChannel();
         }
         if(this.channel === undefined) throw new Error("Missing channel");
         await this.channel.assertQueue(this.queueName, this.queueOptions);
@@ -76,9 +61,9 @@ export class RabbitMQBroker extends TaskBroker
         {
             if(this.channel === undefined)
             {
-                let conn = await amqp.connect(this.amqpURL);
-                this.channel = await conn.createChannel();
+                await this.createChannel();
             }
+            if(this.channel === undefined) throw new Error("Missing channel");
             await this.channel.assertQueue(this.queueName, this.queueOptions);
             await this.channel.prefetch(1);
             console.log("Connection to RabbitMQ successful, waiting for tasks")
@@ -103,5 +88,125 @@ export class RabbitMQBroker extends TaskBroker
             throw err;
         }
        
+    }
+
+    private async createChannel():Promise<void>
+    {
+        if(!this.connectionHandling)
+        {
+            this.connectionHandling = true;
+            let delayer:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
+            this.delayerPromise = new Promise(function (resolve, reject):void {
+                delayer.res = resolve;
+                delayer.rej = reject;
+            });
+            this.delayerResolver = delayer;
+
+            let conn = await amqp.connect(this.amqpURL);
+            this.channel = await conn.createChannel();
+
+            this.delayerResolver.res();
+        }
+        else
+        {
+            await this.delayerPromise;
+        }
+    }
+}
+
+export class SQSBroker extends TaskBroker
+{
+    queueURL?:string;
+    sqs:SQS;
+
+    constructor(callback:(path:string)=>Promise<void>, queueOptions:SQS.CreateQueueRequest, messageOptions:Object)
+    {
+        super(callback, queueOptions, messageOptions);
+        this.sqs = new SQS({
+            region: sqsRegion,
+            accessKeyId: sqsAccessID,
+            secretAccessKey: sqsAccessKey
+        })
+    }
+
+    public async pushTask(task:string):Promise<void>
+    {
+        return new Promise(async (resolve, reject) =>
+        {
+            try
+            {
+                if(this.queueURL === undefined) await this.createQueue();
+                this.sqs.sendMessage({
+                    QueueUrl: this.queueURL as string,
+                    MessageBody: task
+                }, function(err, data):void {
+                    console.log("pushed op :", task);
+                    resolve();
+                    return;
+                });
+            }
+            catch(err){
+                reject(err);
+                return;
+            }
+        });    
+    }
+
+    public async runTasks():Promise<void>
+    {
+        return new Promise(async (resolve, reject) =>
+        {
+            try{
+                if(this.queueURL === undefined) await this.createQueue();
+                this.sqs.receiveMessage({QueueUrl: this.queueURL as string}, async function(this: SQSBroker, err, data)
+                {
+                    if(err) throw err;
+                    if(data.Messages === undefined) 
+                    {
+                        resolve(); 
+                        return;
+                    }
+                    let msg:SQS.Message = data.Messages[0];
+                    if(msg.Body === undefined) throw new Error("Received empty message");
+                    await this.callback(msg.Body);
+                    this.sqs.deleteMessage({
+                        QueueUrl: this.queueURL as string,
+                        ReceiptHandle: msg.ReceiptHandle as string
+                    }, function(err, data)
+                    {
+                        if(err) throw err;
+                        resolve();
+                    });
+                    return;
+                })
+            }
+            catch(err){
+                reject(err);
+                return;
+            }
+        });
+    }
+
+    private async createQueue():Promise<void>
+    {
+        return new Promise((resolve, reject) =>
+        {
+        try
+        {
+            if(this.queueURL === undefined)
+            {
+                this.sqs.createQueue(this.queueOptions as SQS.CreateQueueRequest, function(this:SQSBroker, err, data):void
+                {
+                    if(err) throw err;
+                    if(data.QueueUrl === undefined) throw new Error("Undefined queue URL");
+                    console.log(data);
+                    this.queueURL = data.QueueUrl;
+                    resolve(); 
+                });
+            }
+            else resolve();
+        }
+        catch(err) {reject(err);}
+        });
     }
 }
