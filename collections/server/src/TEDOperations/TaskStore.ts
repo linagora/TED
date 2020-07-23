@@ -1,8 +1,8 @@
-import * as myTypes from "./myTypes";
-import * as CQL from "./BaseOperations";
-import { buildPath } from "./../MacroRoutines/RequestHandling";
+import * as myTypes from "../BaseTools/myTypes";
+import * as CQL from "../CQL/BaseOperations";
+import { buildPath } from "../MacroRoutines/RequestHandling";
 import { ted, cassandra } from "../Config/config";
-import { monitorEventLoopDelay } from "perf_hooks";
+import { createTable } from "../CQL/TableCreation";
 
 export class SaveTaskStore extends CQL.BaseOperation
 {
@@ -67,7 +67,7 @@ export class SaveTaskStore extends CQL.BaseOperation
             types : ["text", "timeuuid", "text"],
             primaryKey: ["path", "op_id"]
         }
-        return await CQL.createTable(tableDefinition);
+        return await createTable(tableDefinition);
     }
 };
 

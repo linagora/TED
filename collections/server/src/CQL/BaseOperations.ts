@@ -1,13 +1,11 @@
-import * as myTypes from "./myTypes";
+import * as myTypes from "../BaseTools/myTypes";
 import * as datastaxTools from "./DatastaxTools";
-import { TStoCQLtypes } from "./SecondaryOperations";
-import { TaskTable } from "./AntiDuplicata";
-import { globalCounter } from "./../index";
-import { Timer, RequestTracker } from "./../Monitoring/Timer";
-import { cassandra, ted } from "./../Config/config";
-import { table } from "console";
+import { TStoCQLtypes } from "../TEDOperations/SecondaryOperations";
+import { globalCounter } from "../index";
+import { Timer, RequestTracker } from "../Monitoring/Timer";
+import { cassandra, ted } from "../Config/config";
+import { createTable } from "./TableCreation";
 
-let runningTableCreation = new TaskTable();
 export const tableCreationError:Error = new Error("Table creation needed, canceling operation");
 
 export abstract class BaseOperation implements myTypes.Operation
@@ -298,10 +296,6 @@ export class BatchOperation implements myTypes.Operation
   queries:myTypes.Query[] | null;
 
   tracker?:RequestTracker;
-  options?:myTypes.QueryOptions;
-
-  tableCreationFlag:boolean = false;
-  tableOptions?:myTypes.TableOptions;
 
   constructor(batch:BaseOperation[], tracker?:RequestTracker)
   {
@@ -363,7 +357,6 @@ export class BatchOperation implements myTypes.Operation
 
   protected async createTable(errmsg:string):Promise<void>
   {
-    this.tableCreationFlag = true;
     let parse = errmsg.match(/[\.a-zA-Z0-9_]*$/);
     if(parse === null) throw new Error("Unable to parse table name in batch error");
     let tableName = parse[0];
@@ -379,81 +372,3 @@ export class BatchOperation implements myTypes.Operation
     throw new Error("Unable to find which operation triggered the error inside the batch " + tableName);
   }
 }
-
-export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
-{
-  try{
-    if(runningTableCreation.isDone(tableDefinition.name)) 
-    {
-      console.log("table already created");
-      await delay(5000);
-      return;
-    }
-    if(runningTableCreation.isRunning(tableDefinition.name))
-    {
-      console.log("Waiting for creation of table ", tableDefinition.name);
-      await runningTableCreation.waitTask(tableDefinition.name);
-      return;
-    }
-    await runningTableCreation.pushTask(tableDefinition.name);
-    await createTableRetry(tableDefinition);
-    runningTableCreation.endTask(tableDefinition.name);
-  }
-  catch(err){
-    runningTableCreation.failTask(tableDefinition.name);
-    throw err;
-  }
-
-}
-
-export async function createTableRetry(tableDefinition:myTypes.TableDefinition):Promise<void>
-{
-  let tableTimer = new Timer("table_creation");
-  let query = createTableQuery(tableDefinition);
-  await datastaxTools.runDB(query, {})
-  .catch( async (err) => 
-  {
-    await delay(1000);
-    await datastaxTools.runDB(query, {});
-  })
-  .catch( async (err) => 
-  {
-    await delay(2000);
-    await datastaxTools.runDB(query, {});
-  })
-  .catch( async (err) => 
-  {
-    await delay(5000);
-    await datastaxTools.runDB(query, {});
-  })
-  .catch( async (err) => 
-  {
-    await delay(10000);
-    await datastaxTools.runDB(query, {});
-  });
-  tableTimer.stop();
-}
-
-function createTableQuery(tableDefinition:myTypes.TableDefinition):myTypes.Query
-{
-  globalCounter.inc("tables_ceated");
-  let res = "CREATE TABLE IF NOT EXISTS " + tableDefinition.name + " (";
-  let primaryKey:string = "(";
-  for(let i:number = 0; i<tableDefinition.keys.length; i++)
-  {
-    res = res + tableDefinition.keys[i] + " " + tableDefinition.types[i] + ", ";
-  }    
-  for(let i:number = 0; i<tableDefinition.primaryKey.length; i++)
-  {
-    primaryKey = primaryKey + tableDefinition.primaryKey[i] + ", ";
-  }
-  primaryKey = primaryKey.slice(0,-2) + ")";
-  res = res + "PRIMARY KEY " + primaryKey + ")";
-  return {query: res, params:[]};
-}
-
-export async function delay(ms:number):Promise<void>
-{
-    return new Promise( resolve => setTimeout(resolve, ms) );
-}
-

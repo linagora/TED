@@ -1,11 +1,12 @@
 import * as myTypes from "../BaseTools/myTypes";
 import * as config from "./../Config/config";
 import * as messageBroker from "./../MessageBroker/MessageBrokerInterface";
-import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
+import { GetTaskStore, RemoveTaskStore } from "../TEDOperations/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
-import { tableCreationError, delay } from "./../BaseTools/BaseOperations"
+import { tableCreationError } from "../CQL/BaseOperations";
+import { delay } from "./../BaseTools/divers";
 
 export let mbInterface:messageBroker.TaskBroker|null;
 

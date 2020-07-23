@@ -1,6 +1,6 @@
-import * as CQL from "./../BaseTools/BaseOperations";
+import * as CQL from "../CQL/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
-import * as secondary from "../BaseTools/SecondaryOperations";
+import * as secondary from "../TEDOperations/SecondaryOperations";
 import { forwardCollection } from "./StoredTaskHandling";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";

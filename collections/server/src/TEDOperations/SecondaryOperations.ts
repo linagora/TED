@@ -1,5 +1,5 @@
-import * as myTypes from "./myTypes";
-import * as CQL from "./BaseOperations";
+import * as myTypes from "../BaseTools/myTypes";
+import * as CQL from "../CQL/BaseOperations";
 import { createHash } from "crypto";
 import { projectTask } from "../MacroRoutines/StoredTaskHandling";
 
