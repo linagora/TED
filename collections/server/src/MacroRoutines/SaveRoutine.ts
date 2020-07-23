@@ -5,6 +5,8 @@ import * as myCrypto from "./../BaseTools/CryptographicTools";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
 
+const noPreviousValue:Error = new Error("Unable to find a previous value");
+
 export default async function saveRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<CQL.BatchOperation>
 {
     if(opDescriptor.clearObject === undefined && opDescriptor.encObject === undefined) throw new Error("missing object in save operation");
@@ -17,29 +19,33 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
         console.log("getting previous value");
         let previousValueEnc = await secondary.getPreviousValue(opDescriptor);
         tracker?.endStep("secondary_table_read");
-        if(previousValueEnc === null) throw new Error("Unable to find a previous value");
+        if(previousValueEnc === null) throw noPreviousValue;
         let previousVersion:myTypes.ServerSideObject =  myCrypto.decryptData( previousValueEnc, myCrypto.globalKey);
         console.log("previous value = ", JSON.stringify(previousVersion));
         opDescriptor.clearObject = {...previousVersion, ...opDescriptor.clearObject};
         Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
         {
-            if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined && previousVersion[key] !== value)
+            if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined && previousVersion[key] !== value && previousVersion[key] !== undefined )
             {
-                if(previousVersion[key] !== undefined ) opArray.push(secondary.removePreviousValue(opDescriptor, secondary.createSecondaryInfos(previousVersion, key)));
-                opArray.push(secondary.getSaveOperationSecondaryIndex(opDescriptor, key));
+                opArray.push(secondary.removePreviousValue(opDescriptor, secondary.createSecondaryInfos(previousVersion, key)));
             }
+            opArray.push(secondary.getSaveOperationSecondaryIndex(opDescriptor, key));
         });
     }
     catch(err)
     {   
         console.error(err);
-        Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
+        if(err === noPreviousValue || err.message.substr(0,18) === "unconfigured table")
         {
-            if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined)
+            Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
             {
-                opArray.push(secondary.getSaveOperationSecondaryIndex(opDescriptor, key));
-            }
-        });
+                if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined)
+                {
+                    opArray.push(secondary.getSaveOperationSecondaryIndex(opDescriptor, key));
+                }
+            });
+        }
+        else throw err;
     }
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
     opArray.push(new CQL.SaveOperation(opDescriptor));

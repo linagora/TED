@@ -5,6 +5,7 @@ import { GetTaskStore, RemoveTaskStore } from "../BaseTools/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
+import { tableCreationError, delay } from "./../BaseTools/BaseOperations"
 
 export let mbInterface:messageBroker.TaskBroker|null;
 
@@ -39,7 +40,7 @@ export async function projectTask(path:string):Promise<void>
     let operations = await getPendingOperations(path);
     for(let op of operations)
     {
-        await runPendingOperation(op);
+        await runPendingOperation(op, false);
     }
 }
 
@@ -68,24 +69,36 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
     return result.queryResults.allResultsEnc;
 }
 
-async function runPendingOperation(opLog:myTypes.DBentry):Promise<void>
+async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise<void>
 {
-    let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
-    let tracker = new RequestTracker({
-        action: myTypes.action.projection,
-        path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
-    }, "projection");
-    await runWriteOperation(opDescriptor, tracker);
-    tracker.endStep("cassandra_write");
-    let rmDescriptor = {...opDescriptor};
-    rmDescriptor.keyOverride = {
-        path: opLog.path,
-        op_id: opLog.op_id
+    try
+    {
+        let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
+        let tracker = new RequestTracker({
+            action: myTypes.action.projection,
+            path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
+        }, "projection");
+        await runWriteOperation(opDescriptor, tracker);
+        tracker.endStep("cassandra_write");
+        let rmDescriptor = {...opDescriptor};
+        rmDescriptor.keyOverride = {
+            path: opLog.path,
+            op_id: opLog.op_id
+        }
+        let removeOperation = new RemoveTaskStore(rmDescriptor);
+        await removeOperation.execute();
+        tracker.endStep("taskstore_remove");
+        tracker.log();
     }
-    let removeOperation = new RemoveTaskStore(rmDescriptor);
-    await removeOperation.execute();
-    tracker.endStep("taskstore_remove");
-    tracker.log();
+    catch(err)
+    {
+        if(err === tableCreationError && retry)
+        {
+            await delay(10000);
+            runPendingOperation(opLog, true);
+        }
+        else throw err;
+    }
 }
 
 
@@ -99,7 +112,7 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
         operationsToForward = await getPendingOperations(path);
         for(let op of operationsToForward)
         {
-            await runPendingOperation(op);
+            await runPendingOperation(op, true);
         }
     }while(operationsToForward.length == config.ted.taskStoreBatchSize )    
 }

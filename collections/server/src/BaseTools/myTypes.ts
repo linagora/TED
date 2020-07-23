@@ -1,4 +1,5 @@
 import {QueryOptions as QO} from "cassandra-driver";
+import { SaveOperation, BatchOperation } from "./BaseOperations";
 
 export type QueryOptions = QO;
 
@@ -151,4 +152,9 @@ export type WhereClause = {
   operator:Operator;
   field:string;
   value:any;
+}
+
+export type Projection = {
+  main: SaveOperation,
+  secondary: BatchOperation
 }

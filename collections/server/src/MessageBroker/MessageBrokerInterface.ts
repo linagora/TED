@@ -169,27 +169,35 @@ export class SQSBroker extends TaskBroker
                 const that = this;
                 this.sqs.receiveMessage({QueueUrl: this.queueURL as string}, async function(err, data)
                 {
-                    if(err) throw err;
-                    if(data.Messages === undefined) 
+                    try
                     {
-                        await delay(1000);
-                        resolve(); 
+                        if(err) reject(err);
+                        if(data.Messages === undefined) 
+                        {
+                            console.log("no message received");
+                            await delay(1000);
+                            resolve(); 
+                            return;
+                        }
+                        let msg:SQS.Message = data.Messages[0];
+                        console.log("New task : ", msg.Body);
+                        if(msg.Body === undefined) throw new Error("Received empty message");
+                        await that.callback(msg.Body);
+                        that.sqs.deleteMessage({
+                            QueueUrl: that.queueURL as string,
+                            ReceiptHandle: msg.ReceiptHandle as string
+                        }, function(err, data)
+                        {
+                            if(err) throw err;
+                            console.log("End of task : ", msg.Body);
+                            resolve();
+                        });
                         return;
                     }
-                    let msg:SQS.Message = data.Messages[0];
-                    console.log("New task : ", msg.Body);
-                    if(msg.Body === undefined) throw new Error("Received empty message");
-                    await that.callback(msg.Body);
-                    that.sqs.deleteMessage({
-                        QueueUrl: that.queueURL as string,
-                        ReceiptHandle: msg.ReceiptHandle as string
-                    }, function(err, data)
+                    catch(err)
                     {
-                        if(err) throw err;
-                        console.log("End of task : ", msg.Body);
-                        resolve();
-                    });
-                    return;
+                        reject(err);
+                    }
                 })
             }
             catch(err){
@@ -202,7 +210,14 @@ export class SQSBroker extends TaskBroker
     public async runTasks():Promise<void>
     {
         while(1){
-            await this.runTask();
+            try{
+                await this.runTask();
+            }
+            catch(err){
+                console.log("End of task with error");
+                console.error(err);
+                await delay(1000);
+            }
         }
     }
 
@@ -227,7 +242,9 @@ export class SQSBroker extends TaskBroker
             }
             else resolve();
         }
-        catch(err) {reject(err);}
+        catch(err) {
+            reject(err);
+        }
         });
     }
 }

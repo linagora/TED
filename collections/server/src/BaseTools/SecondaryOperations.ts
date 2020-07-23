@@ -1,6 +1,7 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
 import { createHash } from "crypto";
+import { projectTask } from "../MacroRoutines/StoredTaskHandling";
 
 
 export let TStoCQLtypes:Map<string, string>= new Map();

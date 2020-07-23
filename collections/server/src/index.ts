@@ -78,28 +78,33 @@ async function main():Promise<void>
   console.log("Initializing http server");
   http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
   {
-    if(req.url === "/metrics")
-    {
-      res.end(promClient.register.metrics());
-      return;
+    try{
+      if(req.url === "/metrics")
+      {
+        res.end(promClient.register.metrics());
+        return;
+      }
+      console.log("\n\n ===== New Incoming Request =====");
+      let httpTimer = new Timer("http_response");
+      let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
+      let tracker = new RequestTracker(operation, "");
+      try
+      {
+        let answer = await handleRequest(operation, tracker);
+        res.write(JSON.stringify(answer));
+        res.end();
+      }
+      catch(err)
+      {
+        console.log("catch2 \n",err);
+        res.write('{"status":"' + err.toString() + '"}');
+        res.end();
+      }
+      httpTimer.stop();
     }
-    console.log("\n\n ===== New Incoming Request =====");
-    let httpTimer = new Timer("http_response");
-    let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
-    let tracker = new RequestTracker(operation, "");
-    try
-    {
-      let answer = await handleRequest(operation, tracker);
-      res.write(JSON.stringify(answer));
-      res.end();
+    catch(err){
+      console.error(err);
     }
-    catch(err)
-    {
-      console.log("catch2 \n",err);
-      res.write('{"status":"' + err.toString() + '"}');
-      res.end();
-    }
-    httpTimer.stop();
   }).listen(8080);
   initTimer.stop();
 }
