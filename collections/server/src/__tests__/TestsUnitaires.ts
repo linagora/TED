@@ -8,7 +8,7 @@ function randint(min:number, max:number) { // min and max included
 };
 
 const mminDepth = 1;
-const maxDepth = 3;
+const maxDepth = 1;
 
 type map = {
     [key:string]:Object
@@ -41,7 +41,7 @@ export function randomObject():DBObject
         pathElem.push(uuidv4());
     }
     let path:string = pathElem.join("/");
-    let param:number = randint(5,15);
+    let param:number = randint(0,2);
     let obj: DBObject = {path: path, object: {}};
     for (let i: number = 0; i<param; i++){
         obj.object["test"+i] = randint(0, 10);

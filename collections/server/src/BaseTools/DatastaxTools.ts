@@ -1,39 +1,82 @@
-import cassandra from "cassandra-driver";
+import cassandra, { types } from "cassandra-driver";
+import { readFileSync } from "fs";
 import * as myTypes from "./myTypes";
 import { v4 as uuidv4 } from "uuid";
 import * as config from "../Config/config";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
 
-export const client = new cassandra.Client(
-{
-    contactPoints: config.cassandraContactPoint,
-    localDataCenter: config.cassandraLocalDatacenter,
-    keyspace: config.cassandraKeyspace,
-    policies: {
-      retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
-    },
-    queryOptions: {
-      isIdempotent: true
-    }
-});
+let cassandraOptions:cassandra.DseClientOptions;
+export let client:cassandra.Client;
  
 export async function setup():Promise<void>
 {
+  switch(config.cassandra.core)
+  {
+    case "keyspace":
+    {
+      const auth = new cassandra.auth.PlainTextAuthProvider(config.cassandra.keyspaceID, config.cassandra.keyspaceKey);
+      const sslOptions = {
+        ca: [readFileSync("src/Config/AmazonRootCA1.pem", 'utf-8')],
+        host: config.cassandra.contactPoint[0],
+        rejectUnauthorized: true
+      };
+      cassandraOptions = {
+        contactPoints: config.cassandra.contactPoint,
+        localDataCenter: config.cassandra.localDatacenter,
+        keyspace: config.cassandra.keyspace,
+        policies: {
+          retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
+        },
+        queryOptions: {
+          isIdempotent: true
+        },
+        authProvider: auth,
+        sslOptions: sslOptions,
+        protocolOptions: {port: 9142}
+      };
+      break;
+    }
+    case "scylladb":
+    case "cassandra":
+    {
+      cassandraOptions = {
+        contactPoints: config.cassandra.contactPoint,
+        localDataCenter: config.cassandra.localDatacenter,
+        keyspace: config.cassandra.keyspace,
+        policies: {
+          retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
+        },
+        queryOptions: {
+          isIdempotent: true
+        }
+      };
+      break;
+    }
+    default:
+    {
+      throw new Error("Unsupported DB core");
+    }
+  }
+  client = new cassandra.Client(cassandraOptions);
   await client.connect()
   .catch( async (err:myTypes.CQLResponseError) => 
   {
       if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
       {
-      return await createKeyspace(config.cassandraKeyspace, config.defaultCassandraKeyspaceOptions as myTypes.KeyspaceReplicationOptions);
+        console.error(err);
+        console.log("trying to create keyspace");
+        return await createKeyspace(config.cassandra.keyspace, config.cassandra.defaultCassandraKeyspaceOptions as myTypes.KeyspaceReplicationOptions);
       }
   })
   .then( () => client.connect());
 }
 
-const defaultQueryOptions:myTypes.QueryOptions = {
-    keyspace:config.cassandraKeyspace,
-    prepare:true,
+
+
+const defaultQueryOptions:cassandra.QueryOptions = {
+  prepare: true,
+  consistency: types.consistencies.localQuorum
 }
 
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
@@ -70,13 +113,14 @@ export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.Query
   {
     let rs:any;
     if(options === undefined) options = defaultQueryOptions;
-    rs = await client.batch(queries, options);
+    for(let query of queries)
+    {
+      await client.execute(query.query, query.params, options);
+    }
     console.log("   End query ", queryID);
     timer.stop();
     tracker?.endStep("batch_write");
-    let res = processResult(rs);
-    tracker?.endStep("result_computation");
-    return res;
+    return {status: "success"};
   }
   catch(err)
   {
@@ -118,10 +162,9 @@ export async function createKeyspace(keyspaceName:string, options:myTypes.Keyspa
   if(nameCtrl === null) throw new Error("Invalid keyspace name");
   let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
   res = res.split('"').join("'");
-  let clientTemp = new cassandra.Client({
-    contactPoints: config.cassandraContactPoint,
-    localDataCenter: config.cassandraLocalDatacenter,
-  });
-  console.log(res);
+  let optionsTemp = {...cassandraOptions};
+  delete optionsTemp.keyspace;
+  let clientTemp = new cassandra.Client(optionsTemp);
   await clientTemp.execute(res);
+  console.log("keyspace created");
 };

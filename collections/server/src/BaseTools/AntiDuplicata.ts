@@ -1,4 +1,4 @@
-import { maxTableCreation } from "./../Config/config";
+import { ted } from "./../Config/config";
 
 type StateTable = {
     [key:string]:Boolean
@@ -93,7 +93,7 @@ export class TaskTable
 
     private async delayer():Promise<void>
     {
-        if(this.taskCounter < maxTableCreation) return;
+        if(this.taskCounter < ted.maxTableCreation) return;
         let promiseExt:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
         let lockPromise = new Promise(function (resolve, reject):void
         {

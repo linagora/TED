@@ -18,7 +18,7 @@ async function writeAndRead():Promise<void>
 {
     
     let saveOps:Promise<void>[] = [];
-    for (let i:number = 0; i<20; i++)
+    for (let i:number = 0; i<10; i++)
     {
         //saveOps.push(saveObject(randomObject()));
         await saveObject(randomObject());
@@ -45,7 +45,7 @@ async function writeAndRead():Promise<void>
         }
         
     }));
-    //console.log("Success : ", bool);
+    console.log("Success : ", bool);
 }
 writeAndRead();
 
