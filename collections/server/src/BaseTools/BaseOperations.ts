@@ -4,9 +4,11 @@ import { TStoCQLtypes } from "./SecondaryOperations";
 import { TaskTable } from "./AntiDuplicata";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
-import { cassandra } from "./../Config/config";
+import { cassandra, ted } from "./../Config/config";
+import { table } from "console";
 
 let runningTableCreation = new TaskTable();
+export const tableCreationError:Error = new Error("Table creation needed, canceling operation");
 
 export abstract class BaseOperation implements myTypes.Operation
 {
@@ -323,9 +325,10 @@ export class BatchOperation implements myTypes.Operation
       this.tracker?.endStep("first_attempt");
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
-        await this.createTable(err.message);
-        this.tracker?.endStep("table_creation");
-        return await this.execute();
+        if(ted.enableMultiTableCreation) this.createAllTables();
+        else this.createTable(err.message);
+        console.log("top");
+        throw tableCreationError;
       }
       return {status: "error", error: err};
     });
@@ -350,10 +353,12 @@ export class BatchOperation implements myTypes.Operation
 
   protected async createAllTables():Promise<void>
   {
+    let promises:Promise<void>[] = [];
     for(let op of this.operations)
     {
-      if(op.canCreateTable) await op.createTable();
+      if(op.canCreateTable) promises.push(op.createTable());
     }
+    await Promise.all(promises);
   }
 
   protected async createTable(errmsg:string):Promise<void>
@@ -427,8 +432,6 @@ export async function createTableRetry(tableDefinition:myTypes.TableDefinition):
     await datastaxTools.runDB(query, {});
   });
   tableTimer.stop();
-  //Add tableOtions
-  //TODO
 }
 
 function createTableQuery(tableDefinition:myTypes.TableDefinition):myTypes.Query
@@ -449,7 +452,7 @@ function createTableQuery(tableDefinition:myTypes.TableDefinition):myTypes.Query
   return {query: res, params:[]};
 }
 
-async function delay(ms:number):Promise<void>
+export async function delay(ms:number):Promise<void>
 {
     return new Promise( resolve => setTimeout(resolve, ms) );
 }

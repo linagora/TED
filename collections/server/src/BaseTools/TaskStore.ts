@@ -2,6 +2,7 @@ import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
 import { buildPath } from "./../MacroRoutines/RequestHandling";
 import { ted, cassandra } from "../Config/config";
+import { monitorEventLoopDelay } from "perf_hooks";
 
 export class SaveTaskStore extends CQL.BaseOperation
 {
@@ -29,8 +30,8 @@ export class SaveTaskStore extends CQL.BaseOperation
       {
         if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
         {
-          return await this.createTable()
-          .then( () => super.execute());
+          await this.createTable();
+          return super.execute();
         }
         return {status:"error", error:err};
       });

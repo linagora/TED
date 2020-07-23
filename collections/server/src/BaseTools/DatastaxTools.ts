@@ -113,10 +113,12 @@ export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.Query
   {
     let rs:any;
     if(options === undefined) options = defaultQueryOptions;
+    let promises:Promise<unknown>[] = [];
     for(let query of queries)
     {
-      await client.execute(query.query, query.params, options);
+      promises.push(client.execute(query.query, query.params, options));
     }
+    await Promise.all(promises);
     console.log("   End query ", queryID);
     timer.stop();
     tracker?.endStep("batch_write");

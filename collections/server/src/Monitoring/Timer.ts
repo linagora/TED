@@ -99,10 +99,11 @@ export class RequestTrackerLog
         }
         Object.entries(tracker.logs).forEach(([key, value]) => 
         {
+            console.log(key, value);
             if(this.prom_logs[key] === undefined)
             {
                 this.prom_logs[key] = new prometheus.Summary({
-                    name: "custom_summary_tracker" + key,
+                    name: "custom_summary_tracker_" + key,
                     help: "a custom summary to record the time of " +  key,
                     labelNames: ["operation_description"]
                 })
@@ -133,7 +134,7 @@ export class RequestTracker
     public endStep(step:string):void
     {
         let tmp = new Date().getTime();
-        this.logs[step] = tmp - this.last;
+        this.logs[step] = tmp - this.last + (this.logs[step] === undefined ? 0 : this.logs[step]);
         this.last = tmp;
     }
 

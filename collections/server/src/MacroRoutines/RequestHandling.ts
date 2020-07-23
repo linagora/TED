@@ -5,7 +5,7 @@ import getRoutine from "./GetRoutine";
 import * as OperationLog from "./../BaseTools/OperationsTable";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 import { SaveTaskStore } from "./../BaseTools/TaskStore";
-import { BatchOperation } from "../BaseTools/BaseOperations";
+import { BatchOperation, tableCreationError } from "../BaseTools/BaseOperations";
 import { mbInterface } from "./StoredTaskHandling";
 import { v1 as uuidv1 } from "uuid";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
@@ -132,11 +132,10 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
         case myTypes.action.remove:
         {
             tracker?.updateLabel("taskstore_write")
-            let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)], tracker);
-            tracker?.endStep("taskstore_operation_computation")
-            await opWrite.execute();
+            await logEvent(opDescriptor, tracker);
+            tracker?.endStep("taskstore_write");
             if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path), opDescriptor.opID);
-            tracker?.endStep("rabbitmq_write");
+            tracker?.endStep("broker_write");
             tracker?.log();
             return {status: "Success"};
         }
@@ -154,6 +153,25 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
             throw new Error("Unauthorized operation");
         }
     }    
+}
+
+export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
+{
+    let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)], tracker);
+    try
+    {
+        await opWrite.execute();
+    }
+    catch(err)
+    {
+        if(err === tableCreationError)
+        {
+            await delay(1000);
+            await logEvent(opDescriptor, tracker);
+        }
+        else throw err;
+    }
+
 }
 
 export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
