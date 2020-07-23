@@ -135,7 +135,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
             let opWrite = new BatchOperation([new OperationLog.OperationLog(opDescriptor), new SaveTaskStore(opDescriptor)], tracker);
             tracker?.endStep("taskstore_operation_computation")
             await opWrite.execute();
-            if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path));
+            if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path), opDescriptor.opID);
             tracker?.endStep("rabbitmq_write");
             tracker?.log();
             return {status: "Success"};

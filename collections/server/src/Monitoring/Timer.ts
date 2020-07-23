@@ -42,7 +42,6 @@ export class TimerLogsMap
     {
         if(this.logs[key] === undefined || this.prom_logs[key] === undefined)
         {
-            console.log(key);
             this.logs[key] = [];
             this.prom_logs[key] = new prometheus.Histogram({
                 name: "custom_histogram_" + key,
@@ -100,7 +99,6 @@ export class RequestTrackerLog
         }
         Object.entries(tracker.logs).forEach(([key, value]) => 
         {
-            console.log(key, value);
             if(this.prom_logs[key] === undefined)
             {
                 this.prom_logs[key] = new prometheus.Summary({

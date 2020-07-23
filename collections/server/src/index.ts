@@ -3,7 +3,7 @@ import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
 import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./MacroRoutines/StoredTaskHandling";
 import { setup as cryptoSetup } from "./BaseTools/CryptographicTools";
-import { setup as cassandraSetup} from "./BaseTools/DatastaxTools";
+import { setup as cassandraSetup, client as cassandraClient} from "./BaseTools/DatastaxTools";
 import { TimerLogsMap, Timer, RequestTracker, RequestTrackerLog } from "./Monitoring/Timer";
 import { CounterMap } from "./Monitoring/Counter";
 import { setup as promSetup } from "./Monitoring/PrometheusClient";
@@ -16,10 +16,10 @@ export let globalTrackerLogs:RequestTrackerLog;
 
 async function setup():Promise<void>
 {
-  if(config.sentry === true)
+  if(config.sentry.sentry === true)
   {
     let Sentry = require("@sentry/node");
-    Sentry.init({dsn: config.sentryDSN});
+    Sentry.init({dsn: config.sentry.DSN});
   }
   globalTrackerLogs = new RequestTrackerLog();
   RequestTracker.logMap = globalTrackerLogs;
@@ -61,7 +61,7 @@ async function main():Promise<void>
   console.log("This is a highway to hell");
   let initTimer = new Timer("program_init");
   await setup();
-  if(mbInterface !== null) mbInterface.runTasks();
+  if(mbInterface !== undefined && mbInterface !== null) mbInterface.runTasks();
   else console.log("Running without task broker");
   await fastForwardTaskStore()
   .catch( (err:myTypes.CQLResponseError) =>
@@ -78,12 +78,12 @@ async function main():Promise<void>
   console.log("Initializing http server");
   http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
   {
-    console.log("\n\n ===== New Incoming Request =====");
     if(req.url === "/metrics")
     {
       res.end(promClient.register.metrics());
       return;
     }
+    console.log("\n\n ===== New Incoming Request =====");
     let httpTimer = new Timer("http_response");
     let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
     let tracker = new RequestTracker(operation, "");

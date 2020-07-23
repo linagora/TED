@@ -1,7 +1,6 @@
 import * as myTypes from "./myTypes";
 import crypto from "crypto";
-import { cryptoAlgorithm } from "../Config/config";
-import * as config from "./../Config/config";
+import { crypto as config } from "../Config/config";
 import { globalCounter } from "./../index";
 import { Timer } from "./../Monitoring/Timer";
 
@@ -52,7 +51,7 @@ function encryptData(data:myTypes.ServerSideObject, key:crypto.KeyObject):myType
   globalCounter.inc("encryption");
   let timer = new Timer("encryption");
   let iv = crypto.randomBytes(16);
-  const cipher:crypto.Cipher = crypto.createCipheriv(cryptoAlgorithm, key, iv);
+  const cipher:crypto.Cipher = crypto.createCipheriv(config.algorithm, key, iv);
   let encData:string = cipher.update(JSON.stringify(data), 'utf8', 'hex');
   encData += cipher.final('hex');
   let encObject:myTypes.EncObject;
@@ -68,7 +67,7 @@ export function decryptData(encObject:myTypes.EncObject, key:crypto.KeyObject):m
   let timer = new Timer("decryption");
   if(encObject.iv === undefined) throw new Error("Unable to decrypt data, missing iv");
   if(encObject.auth === undefined) throw new Error("Unable to decrypt data, missing auth");
-  const decipher:crypto.Decipher = crypto.createDecipheriv(cryptoAlgorithm, key, Buffer.from(encObject.iv, 'base64'));
+  const decipher:crypto.Decipher = crypto.createDecipheriv(config.algorithm, key, Buffer.from(encObject.iv, 'base64'));
   if(isDecipherGCM(decipher)) decipher.setAuthTag(Buffer.from(encObject.auth, 'base64'));
   let clearData:string = decipher.update(encObject.data, 'hex', 'utf8');
   clearData += decipher.final('utf8');

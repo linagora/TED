@@ -4,7 +4,7 @@ import { TStoCQLtypes } from "./SecondaryOperations";
 import { TaskTable } from "./AntiDuplicata";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
-import { tracker } from "cassandra-driver";
+import { cassandra } from "./../Config/config";
 
 let runningTableCreation = new TaskTable();
 
@@ -62,7 +62,7 @@ export abstract class BaseOperation implements myTypes.Operation
   public buildTableName():string
   {
     if(this.tableOptions.tableName !== undefined) return this.tableOptions.tableName;
-    let res = "";
+    let res = cassandra.keyspace + ".";
     for(let i:number = 0; i<this.collections.length; i++)
     {
       res = res + this.collections[i] + "_";
@@ -359,11 +359,9 @@ export class BatchOperation implements myTypes.Operation
   protected async createTable(errmsg:string):Promise<void>
   {
     this.tableCreationFlag = true;
-    let parse = errmsg.match(/ [a-zA-Z0-9_]*$/);
+    let parse = errmsg.match(/[\.a-zA-Z0-9_]*$/);
     if(parse === null) throw new Error("Unable to parse table name in batch error");
-    let tableName = parse[0].slice(1);
-    console.log(tableName);
-
+    let tableName = parse[0];
     for(let op of this.operations)
     {
       let tmp = op.buildTableName();
@@ -380,7 +378,12 @@ export class BatchOperation implements myTypes.Operation
 export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
 {
   try{
-    if(runningTableCreation.isDone(tableDefinition.name)) return;
+    if(runningTableCreation.isDone(tableDefinition.name)) 
+    {
+      console.log("table already created");
+      await delay(5000);
+      return;
+    }
     if(runningTableCreation.isRunning(tableDefinition.name))
     {
       console.log("Waiting for creation of table ", tableDefinition.name);
@@ -402,26 +405,26 @@ export async function createTableRetry(tableDefinition:myTypes.TableDefinition):
 {
   let tableTimer = new Timer("table_creation");
   let query = createTableQuery(tableDefinition);
-  await datastaxTools.runDB(query)
+  await datastaxTools.runDB(query, {})
   .catch( async (err) => 
   {
     await delay(1000);
-    await datastaxTools.runDB(query);
+    await datastaxTools.runDB(query, {});
   })
   .catch( async (err) => 
   {
     await delay(2000);
-    await datastaxTools.runDB(query);
+    await datastaxTools.runDB(query, {});
   })
   .catch( async (err) => 
   {
     await delay(5000);
-    await datastaxTools.runDB(query);
+    await datastaxTools.runDB(query, {});
   })
   .catch( async (err) => 
   {
     await delay(10000);
-    await datastaxTools.runDB(query);
+    await datastaxTools.runDB(query, {});
   });
   tableTimer.stop();
   //Add tableOtions

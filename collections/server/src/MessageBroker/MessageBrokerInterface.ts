@@ -1,8 +1,9 @@
 import * as amqp from "amqplib";
 import { SQS } from "aws-sdk";
-import {sqsRegion, sqsAccessID, sqsAccessKey } from "./../Config/config";
+import { sqs } from "./../Config/config";
 import { UdpContainerSettings } from "aws-sdk/clients/medialive";
 import { promisify } from "util";
+import { monitorEventLoopDelay } from "perf_hooks";
 
 type ExternalResolver = {
     res:() => void,
@@ -22,7 +23,7 @@ export abstract class TaskBroker
         this.callback = callback;
     }
 
-    public abstract async pushTask(task:string):Promise<void>;
+    public abstract async pushTask(task:string, ID:string):Promise<void>;
     public abstract async runTasks():Promise<void>;
 }
 
@@ -44,7 +45,7 @@ export class RabbitMQBroker extends TaskBroker
         this.connectionHandling = false;
     }
 
-    public async pushTask(task:string):Promise<void>
+    public async pushTask(task:string, ID:string):Promise<void>
     {
         if(this.channel === undefined)
         {
@@ -123,13 +124,13 @@ export class SQSBroker extends TaskBroker
     {
         super(callback, queueOptions, messageOptions);
         this.sqs = new SQS({
-            region: sqsRegion,
-            accessKeyId: sqsAccessID,
-            secretAccessKey: sqsAccessKey
+            region: sqs.region,
+            accessKeyId: sqs.accessID,
+            secretAccessKey: sqs.accessKey
         })
     }
 
-    public async pushTask(task:string):Promise<void>
+    public async pushTask(task:string, ID:string):Promise<void>
     {
         return new Promise(async (resolve, reject) =>
         {
@@ -138,9 +139,16 @@ export class SQSBroker extends TaskBroker
                 if(this.queueURL === undefined) await this.createQueue();
                 this.sqs.sendMessage({
                     QueueUrl: this.queueURL as string,
-                    MessageBody: task
+                    MessageBody: task,
+                    MessageGroupId: "projection",
+                    MessageDeduplicationId: ID
                 }, function(err, data):void {
-                    console.log("pushed op :", task);
+                    if(err) 
+                    {
+                        reject(err);
+                        return;
+                    }
+                    console.log("pushed op sqs :", task);
                     resolve();
                     return;
                 });
@@ -152,29 +160,33 @@ export class SQSBroker extends TaskBroker
         });    
     }
 
-    public async runTasks():Promise<void>
+    private async runTask():Promise<void>
     {
         return new Promise(async (resolve, reject) =>
         {
             try{
                 if(this.queueURL === undefined) await this.createQueue();
-                this.sqs.receiveMessage({QueueUrl: this.queueURL as string}, async function(this: SQSBroker, err, data)
+                const that = this;
+                this.sqs.receiveMessage({QueueUrl: this.queueURL as string}, async function(err, data)
                 {
                     if(err) throw err;
                     if(data.Messages === undefined) 
                     {
+                        await delay(1000);
                         resolve(); 
                         return;
                     }
                     let msg:SQS.Message = data.Messages[0];
+                    console.log("New task : ", msg.Body);
                     if(msg.Body === undefined) throw new Error("Received empty message");
-                    await this.callback(msg.Body);
-                    this.sqs.deleteMessage({
-                        QueueUrl: this.queueURL as string,
+                    await that.callback(msg.Body);
+                    that.sqs.deleteMessage({
+                        QueueUrl: that.queueURL as string,
                         ReceiptHandle: msg.ReceiptHandle as string
                     }, function(err, data)
                     {
                         if(err) throw err;
+                        console.log("End of task : ", msg.Body);
                         resolve();
                     });
                     return;
@@ -187,20 +199,29 @@ export class SQSBroker extends TaskBroker
         });
     }
 
+    public async runTasks():Promise<void>
+    {
+        while(1){
+            await this.runTask();
+        }
+    }
+
     private async createQueue():Promise<void>
     {
+        console.log("trying to create queue");
         return new Promise((resolve, reject) =>
         {
         try
         {
             if(this.queueURL === undefined)
             {
-                this.sqs.createQueue(this.queueOptions as SQS.CreateQueueRequest, function(this:SQSBroker, err, data):void
+                const that = this;
+                this.sqs.createQueue(this.queueOptions as SQS.CreateQueueRequest, function(err, data):void
                 {
                     if(err) throw err;
                     if(data.QueueUrl === undefined) throw new Error("Undefined queue URL");
-                    console.log(data);
-                    this.queueURL = data.QueueUrl;
+                    console.log(data.QueueUrl);
+                    that.queueURL = data.QueueUrl;
                     resolve(); 
                 });
             }
@@ -209,4 +230,9 @@ export class SQSBroker extends TaskBroker
         catch(err) {reject(err);}
         });
     }
+}
+
+async function delay(ms:number):Promise<void>
+{
+    return new Promise( resolve => setTimeout(resolve, ms) );
 }

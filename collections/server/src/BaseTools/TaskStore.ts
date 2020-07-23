@@ -1,12 +1,12 @@
 import * as myTypes from "./myTypes";
 import * as CQL from "./BaseOperations";
 import { buildPath } from "./../MacroRoutines/RequestHandling";
-import { defaultTaskStoreTTL } from "../Config/config";
+import { ted, cassandra } from "../Config/config";
 
 export class SaveTaskStore extends CQL.BaseOperation
 {
     entry:myTypes.LogEntry;
-    ttl:number = defaultTaskStoreTTL;
+    ttl:number = ted.defaultTaskStoreTTL;
 
     constructor(operation:myTypes.InternalOperationDescription)
     {
@@ -39,7 +39,7 @@ export class SaveTaskStore extends CQL.BaseOperation
 
     public buildTableName():string
     {
-        return "global_taskstore";
+        return cassandra.keyspace + ".global_taskstore";
     }
 
     protected buildQuery():void
@@ -48,7 +48,7 @@ export class SaveTaskStore extends CQL.BaseOperation
         let params:string[] = [buildPath(this.collections, this.documents, true), this.opID, this.entry.object];
         let keys:string = "(path, op_id, object)";
         let placeholders:string = "(?, ?, ?)";
-        this.query = {query: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders + " USING TTL " + this.ttl, params: params};
+        this.query = {query: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders/*  + " USING TTL " + this.ttl */, params: params};
     }
 
     protected createLog(operation:myTypes.InternalOperationDescription):string

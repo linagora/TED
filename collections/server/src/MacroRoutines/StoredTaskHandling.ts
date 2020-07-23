@@ -10,18 +10,19 @@ export let mbInterface:messageBroker.TaskBroker|null;
 
 export function setup():void
 {
-    switch(config.broker)
+    switch(config.ted.broker)
     {
         case "RabbitMQ":
         {
             console.log("Intializing RabbitMQ interface");
-            mbInterface = new messageBroker.RabbitMQBroker(config.amqpURL, config.amqpQueueName, projectTask, config.amqpQueueOptions, config.amqpMessageOptions);
+            mbInterface = new messageBroker.RabbitMQBroker(config.rabbitmq.URL, config.rabbitmq.queueName, projectTask, config.rabbitmq.queueOptions, config.rabbitmq.messageOptions);
             break;
         }
         case "SQS":
         {
             console.log("Intializing SQS interface");
-            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqsQueueOptions, config.sqsMessageOptions);
+            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.queueOptions, config.sqs.messageOptions);
+            break;
         }
         default:
         {
@@ -59,7 +60,7 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
         },
         options: {
             order: "op_id ASC",
-            limit: config.taskStoreBatchSize
+            limit: config.ted.taskStoreBatchSize
         }
     })
     let result = await getOperation.execute();
@@ -100,7 +101,7 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
         {
             await runPendingOperation(op);
         }
-    }while(operationsToForward.length == config.taskStoreBatchSize )    
+    }while(operationsToForward.length == config.ted.taskStoreBatchSize )    
 }
 
 async function getAllOperations():Promise<myTypes.DBentry[]>
@@ -133,7 +134,6 @@ export async function fastForwardTaskStore():Promise<void>
     {
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(op.object);
         let path = buildPath(opDescriptor.collections, opDescriptor.documents, true)
-        await mbInterface.pushTask(path);
-        console.log("pushed op : ", path);
+        await mbInterface.pushTask(path, opDescriptor.opID);
     }
 }
