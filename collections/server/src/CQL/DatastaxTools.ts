@@ -1,10 +1,10 @@
 import cassandra, { types } from "cassandra-driver";
 import { readFileSync } from "fs";
-import * as myTypes from "./myTypes";
+import * as myTypes from "../BaseTools/myTypes";
 import { v4 as uuidv4 } from "uuid";
 import * as config from "../Config/config";
-import { globalCounter } from "./../index";
-import { Timer, RequestTracker } from "./../Monitoring/Timer";
+import { globalCounter } from "../index";
+import { Timer, RequestTracker } from "../Monitoring/Timer";
 
 let cassandraOptions:cassandra.DseClientOptions;
 export let client:cassandra.Client;

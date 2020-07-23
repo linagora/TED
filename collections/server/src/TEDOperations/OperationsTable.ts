@@ -1,5 +1,6 @@
-import * as myTypes from "./myTypes";
-import * as CQL from "./BaseOperations";
+import * as myTypes from "../BaseTools/myTypes";
+import * as CQL from "../CQL/BaseOperations";
+import { createTable } from "../CQL/TableCreation";
 
 export class OperationLog extends CQL.BaseOperation
 {
@@ -89,6 +90,6 @@ export class OperationLog extends CQL.BaseOperation
             tableDefinition.types.push("uuid");
         }
         tableDefinition.primaryKey.push("op_id");
-        return await CQL.createTable(tableDefinition);
+        return await createTable(tableDefinition);
     }
 }

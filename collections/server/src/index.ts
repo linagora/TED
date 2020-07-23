@@ -3,7 +3,7 @@ import handleRequest from "./MacroRoutines/RequestHandling";
 import * as myTypes from "./BaseTools/myTypes";
 import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./MacroRoutines/StoredTaskHandling";
 import { setup as cryptoSetup } from "./BaseTools/CryptographicTools";
-import { setup as cassandraSetup, client as cassandraClient} from "./BaseTools/DatastaxTools";
+import { setup as cassandraSetup, client as cassandraClient} from "./CQL/DatastaxTools";
 import { TimerLogsMap, Timer, RequestTracker, RequestTrackerLog } from "./Monitoring/Timer";
 import { CounterMap } from "./Monitoring/Counter";
 import { setup as promSetup } from "./Monitoring/PrometheusClient";
