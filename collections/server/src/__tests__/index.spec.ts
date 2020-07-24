@@ -2,7 +2,7 @@ import {saveObject, randomObject, createdObjects, getObject, writeFusion, writeR
 import { writeFile, readFile } from "fs"
 import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
-import { Timer } from "./../Monitoring/Timer";
+import { Timer } from "../ted/services/monitoring/Timer";
 
 async function delay(ms:number):Promise<void>
 {
@@ -11,7 +11,7 @@ async function delay(ms:number):Promise<void>
 
 
 //writeReadDelRead();
-writeFusion();
+//writeFusion();
 //getObject("b/2704dcd3-1f82-43e3-9da5-f539fd2e2110/aa/f61ed9ab-3cbd-4c98-ba86-6d369d610094/aaa/5f6d16e8-59bd-4388-9005-bc39cd52ee3f").then( (res) => console.log(res));
 
 async function writeAndRead():Promise<void>
@@ -47,5 +47,5 @@ async function writeAndRead():Promise<void>
     }));
     console.log("Success : ", bool); */
 }
-//writeAndRead();
+writeAndRead();
 
