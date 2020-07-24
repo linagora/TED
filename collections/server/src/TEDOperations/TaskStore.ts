@@ -1,26 +1,24 @@
 import * as myTypes from "../BaseTools/myTypes";
-import * as CQL from "../CQL/BaseOperations";
 import { buildPath } from "../MacroRoutines/RequestHandling";
 import { ted, cassandra } from "../Config/config";
 import { createTable } from "../CQL/TableCreation";
+import { SaveOperation, tableCreationError, GetOperation, RemoveOperation } from "../BaseTools/BaseOperations";
 
-export class SaveTaskStore extends CQL.BaseOperation
+export class SaveTaskStore extends SaveOperation
 {
-    entry:myTypes.LogEntry;
-    ttl:number = ted.defaultTaskStoreTTL;
-
     constructor(operation:myTypes.InternalOperationDescription)
     {
         super({
-            action: myTypes.action.log,
+            action: myTypes.action.save,
             opID: operation.opID,
             collections: operation.collections,
             documents: operation.documents,
-            tableOptions:{secondaryTable:false}
+            encObject: SaveTaskStore.createLog(operation)
         });
-        this.entry = {object: this.createLog(operation)};
+        if(this.options === undefined) this.options = {};
+        this.options.ttl = ted.defaultTaskStoreTTL;
         this.canCreateTable = true;
-        this.buildQuery();
+        this.buildOperation();
     }
 
     public async execute():Promise<myTypes.ServerAnswer>
@@ -31,32 +29,22 @@ export class SaveTaskStore extends CQL.BaseOperation
         if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
         {
           await this.createTable();
-          return super.execute();
+          throw tableCreationError;
         }
         return {status:"error", error:err};
       });
     }
   
-
-    public buildTableName():string
-    {
-        return cassandra.keyspace + ".global_taskstore";
-    }
-
-    protected buildQuery():void
-    {
-        let tableName:string = this.buildTableName();
-        let params:string[] = [buildPath(this.collections, this.documents, true), this.opID, this.entry.object];
-        let keys:string = "(path, op_id, object)";
-        let placeholders:string = "(?, ?, ?)";
-        this.query = {query: "INSERT INTO " + tableName + " " + keys + " VALUES " + placeholders/*  + " USING TTL " + this.ttl */, params: params};
-    }
-
-    protected createLog(operation:myTypes.InternalOperationDescription):string
+    protected static createLog(operation:myTypes.InternalOperationDescription):string
     {
       let copy:myTypes.InternalOperationDescription = {...operation};
       delete copy.clearObject;
       return JSON.stringify(copy);
+    }  
+
+    public buildTableName():string
+    {
+        return cassandra.keyspace + ".global_taskstore";
     }
 
     public async createTable():Promise<void>
@@ -71,66 +59,64 @@ export class SaveTaskStore extends CQL.BaseOperation
     }
 };
 
-export class GetTaskStore extends CQL.GetOperation
+export class GetTaskStore extends GetOperation
 {
     keyOverride:myTypes.DBentry;
 
-    constructor(request:myTypes.InternalOperationDescription)
+    constructor(operation:myTypes.InternalOperationDescription)
     {
-        super(request);
-        if(request.keyOverride === undefined) this.keyOverride = {};
-        else this.keyOverride = request.keyOverride;
-        this.buildQuery();
+        super({
+            action: operation.action,
+            opID: operation.opID,
+            collections: operation.collections,
+            documents: operation.documents
+        });
+        if(operation.keyOverride === undefined) this.keyOverride = {
+            path: buildPath(this.collections, this.documents, true)
+        };
+        else this.keyOverride = operation.keyOverride;
+        this.buildOperation();
     }
 
     public buildTableName():string
     {
-        return "global_taskstore";
+        return cassandra.keyspace + ".global_taskstore";
     }
 
-    protected buildPrimaryKey():myTypes.Query
+    protected buildEntry():myTypes.DBentry
     {
-        if(this.keyOverride === undefined) return {query: "", params: []};
-        let res = "";
-        let params:string[] = [];
-        Object.entries(this.keyOverride).forEach( ([key, value]) => 
-        {
-            res = res + key + " = ? AND ";
-            params.push(value);
-        });
-        res = res.slice(0,-5);
-        return {query: res, params: params};
+        return this.keyOverride;
     }
+
+    public async createTable():Promise<void>{}
 };
 
-export class RemoveTaskStore extends CQL.RemoveOperation
+export class RemoveTaskStore extends RemoveOperation
 {
     keyOverride:myTypes.DBentry;
 
-    constructor(request:myTypes.InternalOperationDescription)
+    constructor(operation:myTypes.InternalOperationDescription)
     {
-        super(request);
-        if(request.keyOverride === undefined) this.keyOverride = {};
-        else this.keyOverride = request.keyOverride;
-        this.buildQuery();
+        super({
+            action: operation.action,
+            opID: operation.opID,
+            collections: operation.collections,
+            documents: operation.documents
+        });
+        if(operation.keyOverride === undefined) throw new Error("Missing information to delete operation from TaskStore");
+        this.keyOverride = operation.keyOverride;
+        this.buildOperation();
     }
 
     public buildTableName():string
     {
-        return "global_taskstore";
+        return cassandra.keyspace + ".global_taskstore";
     }
 
-    protected buildPrimaryKey():myTypes.Query
+    protected buildEntry():myTypes.DBentry
     {
-        if(this.keyOverride === undefined) return {query: "", params: []};
-        let res = "";
-        let params:string[] = [];
-        Object.entries(this.keyOverride).forEach( ([key, value]) => 
-        {
-            res = res + key + " = ? AND ";
-            params.push(value);
-        });
-        res = res.slice(0,-5);
-        return {query: res, params: params};
+        return this.keyOverride;
     }
+
+    public async createTable():Promise<void>{}
 }

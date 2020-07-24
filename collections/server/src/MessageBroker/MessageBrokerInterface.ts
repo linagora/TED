@@ -1,9 +1,7 @@
 import * as amqp from "amqplib";
 import { SQS } from "aws-sdk";
 import { sqs } from "./../Config/config";
-import { UdpContainerSettings } from "aws-sdk/clients/medialive";
-import { promisify } from "util";
-import { monitorEventLoopDelay } from "perf_hooks";
+import { delay } from "./../BaseTools/divers";
 
 type ExternalResolver = {
     res:() => void,
@@ -247,9 +245,4 @@ export class SQSBroker extends TaskBroker
         }
         });
     }
-}
-
-async function delay(ms:number):Promise<void>
-{
-    return new Promise( resolve => setTimeout(resolve, ms) );
 }

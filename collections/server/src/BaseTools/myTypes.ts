@@ -1,5 +1,5 @@
 import {QueryOptions as QO} from "cassandra-driver";
-import { SaveOperation, BaseOperation } from "../CQL/BaseOperations";
+import { SaveOperation, BaseOperation } from "./BaseOperations";
 
 export type QueryOptions = QO;
 
@@ -8,10 +8,8 @@ export enum action
   save = "save",
   get = "get",
   remove = "remove",
-  configure = "configure",
   batch = "batch",
-  log = "log",
-  projection = "projection"
+  array = "array",
 };
 
 export enum Operator
@@ -36,25 +34,27 @@ export type SaveOptions = {
   ttl?:number;
 };
 
-export type Filter = {
-  //TODO
-};
+export type GetOptions = {
+  limit: number,
+  order: Order[],
+  page: unknown,
+  where: WhereClause
+}
 
 export type Order = {
-  //TODO
+  key:string,
+  order:"ASC" | "DESC"
 };
 
 export type ServerBaseRequest = {
   action: action;
   path:string;
   object?:ServerSideObject;
-  options?:SaveOptions | any;
-  filter?:Filter;
+  options?:SaveOptions | GetOptions;
   order?:Order;
   limit?:number;
   pageToken?:string;
   operations?:ServerBaseRequest[];
-  where?:WhereClause;
 };
 
 export type InternalOperationDescription = {
@@ -66,9 +66,10 @@ export type InternalOperationDescription = {
   encObject?:string;
   operations?:InternalOperationDescription[];
   options?:any;
-  tableOptions:TableOptions;
-  secondaryInfos?:WhereClause;
+  tableOptions?:TableOptions;
+  secondaryInfos?:SecondaryInfos;
   keyOverride?:DBentry;
+  where?:WhereClause;
 };
 
 export type ServerAnswer = {
@@ -130,9 +131,16 @@ export type TableOptions = {
   //TODO
 }
 
-export interface Operation 
+export interface DBDirectOperation 
 {
   action:action;
+  execute():Promise<ServerAnswer>;
+}
+
+export interface GenericOperation
+{
+  action:action;
+  operation:DBDirectOperation|null;
   execute():Promise<ServerAnswer>;
 }
 
@@ -145,7 +153,8 @@ export type LogEntry = {
 
 export type SecondaryInfos = {
   secondaryKey:string;
-  secondaryValue?:any;
+  operator:Operator;
+  secondaryValue:any;
 }
 
 export type WhereClause = {
@@ -158,6 +167,5 @@ export type CQLOperationInfos = {
   action:action,
   keys:DBentry,
   table:string,
-  object?:string,
-  options?:SaveOptions | any
+  options?:SaveOptions | GetOptions
 }
