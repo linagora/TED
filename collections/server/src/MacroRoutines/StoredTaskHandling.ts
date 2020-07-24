@@ -5,7 +5,7 @@ import { GetTaskStore, RemoveTaskStore } from "../TEDOperations/TaskStore";
 import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
-import { tableCreationError } from "../CQL/BaseOperations";
+import { tableCreationError } from "../BaseTools/BaseOperations";
 import { delay } from "./../BaseTools/divers";
 
 export let mbInterface:messageBroker.TaskBroker|null;

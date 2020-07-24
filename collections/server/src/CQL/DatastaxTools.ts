@@ -102,16 +102,13 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
   }
 };
 
-export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
 {
-  globalCounter.inc("cql_batch");
-  let timer = new Timer("cql_batch");
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
   try
   {
-    let rs:any;
     if(options === undefined) options = defaultQueryOptions;
     let promises:Promise<unknown>[] = [];
     for(let query of queries)
@@ -120,14 +117,30 @@ export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.Query
     }
     await Promise.all(promises);
     console.log("   End query ", queryID);
-    timer.stop();
-    tracker?.endStep("batch_write");
     return {status: "success"};
   }
   catch(err)
   {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
-    timer.stop();
+    throw err;
+  }
+}
+
+export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+{
+  let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
+  let queryID = uuidv4()
+  console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
+  try
+  {
+    if(options === undefined) options = defaultQueryOptions;
+    await client.batch(queries, options);
+    console.log("   End query ", queryID);
+    return {status: "success"};
+  }
+  catch(err)
+  {
+    console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
 }
