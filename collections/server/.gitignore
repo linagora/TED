@@ -5,4 +5,4 @@ yarn-error.log
 /src/__tests__/DBState.json
 /src/config/config.ts
 /src/config/AmazonRootCA1.pem
-/src/Monitoring/logs/
+src/ted/services/monitoring/logs/
