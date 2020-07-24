@@ -17,7 +17,7 @@ export async function setup():Promise<void>
     {
       const auth = new cassandra.auth.PlainTextAuthProvider(config.cassandra.keyspaceID, config.cassandra.keyspaceKey);
       const sslOptions = {
-        ca: [readFileSync("src/Config/AmazonRootCA1.pem", 'utf-8')],
+        ca: [readFileSync("src/config/AmazonRootCA1.pem", 'utf-8')],
         host: config.cassandra.contactPoint[0],
         rejectUnauthorized: true
       };

@@ -1,8 +1,7 @@
-import * as myTypes from "../../../utils/myTypes";
-import * as CQL from "../baseOperations";
+import * as myTypes from "../../services/utils/myTypes";
 import { createHash } from "crypto";
-import { createTable } from "../../adapters/cql/TableCreation";
-import { SaveOperation, GetOperation, tableCreationError, RemoveOperation } from "../baseOperations";
+import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { SaveOperation, GetOperation, tableCreationError, RemoveOperation } from "../../services/database/operations/baseOperations";
 
 export let TStoCQLtypes:Map<string, string>= new Map();
 TStoCQLtypes.set("string", "text");
