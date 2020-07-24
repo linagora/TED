@@ -35,10 +35,10 @@ export type SaveOptions = {
 };
 
 export type GetOptions = {
-  limit: number,
-  order: Order[],
-  page: unknown,
-  where: WhereClause
+  limit?: number,
+  order?: Order[],
+  page?: unknown,
+  where?: WhereClause
 }
 
 export type Order = {
@@ -54,7 +54,6 @@ export type ServerBaseRequest = {
   order?:Order;
   limit?:number;
   pageToken?:string;
-  operations?:ServerBaseRequest[];
 };
 
 export type InternalOperationDescription = {
@@ -65,7 +64,7 @@ export type InternalOperationDescription = {
   clearObject?:ServerSideObject;
   encObject?:string;
   operations?:InternalOperationDescription[];
-  options?:any;
+  options?:SaveOptions | GetOptions;
   tableOptions?:TableOptions;
   secondaryInfos?:SecondaryInfos;
   keyOverride?:DBentry;

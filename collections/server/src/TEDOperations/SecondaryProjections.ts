@@ -220,7 +220,7 @@ export function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryK
     }
 }
 
-export function removePreviousValue(opDescriptor:myTypes.InternalOperationDescription, where:myTypes.SecondaryInfos):CQL.RemoveOperation
+export function removePreviousValue(opDescriptor:myTypes.InternalOperationDescription, where:myTypes.SecondaryInfos):RemoveSecondaryView
 {
     if( opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Need the object ID to remove its previuous value");
     return getRemoveSecondaryView(opDescriptor, where);

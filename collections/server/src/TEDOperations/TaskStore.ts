@@ -1,5 +1,5 @@
 import * as myTypes from "../BaseTools/myTypes";
-import { buildPath } from "../MacroRoutines/RequestHandling";
+import { buildPath } from "../BaseTools/divers";
 import { ted, cassandra } from "../Config/config";
 import { createTable } from "../CQL/TableCreation";
 import { SaveOperation, tableCreationError, GetOperation, RemoveOperation } from "../BaseTools/BaseOperations";
@@ -13,6 +13,7 @@ export class SaveTaskStore extends SaveOperation
             opID: operation.opID,
             collections: operation.collections,
             documents: operation.documents,
+            options: operation.options,
             encObject: SaveTaskStore.createLog(operation)
         });
         if(this.options === undefined) this.options = {};
@@ -65,12 +66,7 @@ export class GetTaskStore extends GetOperation
 
     constructor(operation:myTypes.InternalOperationDescription)
     {
-        super({
-            action: operation.action,
-            opID: operation.opID,
-            collections: operation.collections,
-            documents: operation.documents
-        });
+        super(operation);
         if(operation.keyOverride === undefined) this.keyOverride = {
             path: buildPath(this.collections, this.documents, true)
         };
@@ -97,12 +93,7 @@ export class RemoveTaskStore extends RemoveOperation
 
     constructor(operation:myTypes.InternalOperationDescription)
     {
-        super({
-            action: operation.action,
-            opID: operation.opID,
-            collections: operation.collections,
-            documents: operation.documents
-        });
+        super(operation);
         if(operation.keyOverride === undefined) throw new Error("Missing information to delete operation from TaskStore");
         this.keyOverride = operation.keyOverride;
         this.buildOperation();

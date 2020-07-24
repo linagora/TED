@@ -1,33 +1,42 @@
-import * as CQL from "../BaseTools/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
-import * as secondary from "../TEDOperations/SecondaryProjections";
 import { forwardCollection } from "./StoredTaskHandling";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
+import { GetMainView } from "../TEDOperations/MainProjections";
+import { getGetSecondaryView } from "../TEDOperations/SecondaryProjections";
 
 export let EmptyResultError = new Error("No matching object found");
 
-export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<CQL.GetOperation>
+export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<GetMainView>
 {
     globalCounter.inc("get_precompute");
     let timer = new Timer("get_precompute");
     await forwardCollection(opDescriptor);
     tracker?.endStep("collection_update");
 
-    if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new CQL.GetOperation(opDescriptor);
-    if(opDescriptor.secondaryInfos === undefined) return new CQL.GetOperation(opDescriptor);
+    if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new GetMainView(opDescriptor);
+    try
+    {
+        let options = opDescriptor.options as myTypes.GetOptions;
+        if(options.where === undefined) return new GetMainView(opDescriptor);
 
-    let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
-    tracker?.endStep("secondary_table_read");
-    if(matchingIDs.length === 0) throw EmptyResultError;
-    let op = buildGetOperation(opDescriptor, matchingIDs);
-    timer.stop();
-    return op;
+        let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
+        tracker?.endStep("secondary_table_read");
+        if(matchingIDs.length === 0) throw EmptyResultError;
+        let op = buildGetOperation(opDescriptor, matchingIDs);
+        timer.stop();
+        return op;
+    }
+    catch(err)
+    {
+        if(err === EmptyResultError) throw err;
+        return new GetMainView(opDescriptor);
+    }
 }
 
 async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription):Promise<string[]>
 {
-    let secondaryOp = secondary.getGetOperationSecondaryIndex(opDescriptor);
+    let secondaryOp = getGetSecondaryView(opDescriptor);
     let objectKey:string = opDescriptor.collections.slice(-1)[0];
     let result:myTypes.ServerAnswer = await secondaryOp.execute();
     let matchingIDs:string[] = []
@@ -40,18 +49,19 @@ async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription)
     return matchingIDs;        
 }
 
-function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, matchingIDs: string[]):CQL.GetOperation
+function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, matchingIDs: string[]):GetMainView
 {
-    let op = new CQL.GetOperation({
+    let op = new GetMainView({
         action: myTypes.action.get,
         opID: opDescriptor.opID,
         documents: opDescriptor.documents,
         collections: opDescriptor.collections,
-        tableOptions: {secondaryTable: false},
-        secondaryInfos: {
+        options: {
+            where: {
             field: opDescriptor.collections.slice(-1)[0],
             value: matchingIDs,
             operator: myTypes.Operator.in
+            }
         }
     });
     return op
