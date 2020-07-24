@@ -10,7 +10,7 @@ async function delay(ms:number):Promise<void>
 }
 
 
-//writeReadDelRead();
+writeReadDelRead();
 //writeFusion();
 //getObject("b/2704dcd3-1f82-43e3-9da5-f539fd2e2110/aa/f61ed9ab-3cbd-4c98-ba86-6d369d610094/aaa/5f6d16e8-59bd-4388-9005-bc39cd52ee3f").then( (res) => console.log(res));
 
@@ -18,7 +18,7 @@ async function writeAndRead():Promise<void>
 {
     
     let saveOps:Promise<void>[] = [];
-    for (let i:number = 0; i<1; i++)
+    for (let i:number = 0; i<10; i++)
     {
         saveOps.push(saveObject(randomObject()));
         //await saveObject(randomObject());
@@ -29,7 +29,7 @@ async function writeAndRead():Promise<void>
 
     writeFile("src/__tests__/DBState.json", JSON.stringify(createdObjects), "utf8", () => console.log("Done"));
 
-    /* let bool:Boolean = true;
+    let bool:Boolean = true;
     await Promise.all(Object.entries(createdObjects).map( async ([key, value]) => 
     {
         try{
@@ -45,7 +45,7 @@ async function writeAndRead():Promise<void>
         }
         
     }));
-    console.log("Success : ", bool); */
+    console.log("Success : ", bool);
 }
-writeAndRead();
+//writeAndRead();
 

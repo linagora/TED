@@ -1,6 +1,6 @@
-import * as myTypes from "../../../utils/myTypes";
-import { createTable } from "../../adapters/cql/TableCreation";
-import { SaveOperation, tableCreationError } from "../baseOperations";
+import * as myTypes from "../../services/utils/myTypes";
+import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { SaveOperation, tableCreationError } from "../../services/database/operations/baseOperations";
 
 export class SaveEventStore extends SaveOperation
 {

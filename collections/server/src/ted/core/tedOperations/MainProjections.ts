@@ -1,11 +1,6 @@
-import * as myTypes from "../../../utils/myTypes";
-import * as datastaxTools from "../../adapters/cql/DatastaxTools";
-import { TStoCQLtypes } from "./SecondaryProjections";
-import { globalCounter } from "../../../../index";
-import { Timer, RequestTracker } from "../../../Monitoring/Timer";
-import { cassandra, ted } from "../../../../../Config/config";
-import { createTable } from "../../adapters/cql/TableCreation";
-import { SaveOperation, GetOperation, tableCreationError, RemoveOperation } from "../baseOperations";
+import * as myTypes from "../../services/utils/myTypes";
+import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { SaveOperation, GetOperation, tableCreationError, RemoveOperation } from "../../services/database/operations/baseOperations";
 
 export class SaveMainView extends SaveOperation
 {

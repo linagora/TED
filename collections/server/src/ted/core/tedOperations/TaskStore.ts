@@ -1,8 +1,8 @@
-import * as myTypes from "../../../utils/myTypes";
-import { buildPath } from "../../../utils/divers";
-import { ted, cassandra } from "../../../../../Config/config";
-import { createTable } from "../../adapters/cql/TableCreation";
-import { SaveOperation, tableCreationError, GetOperation, RemoveOperation } from "../baseOperations";
+import * as myTypes from "../../services/utils/myTypes";
+import { buildPath } from "../../services/utils/divers";
+import { ted, cassandra } from "../../../config/config";
+import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { SaveOperation, tableCreationError, GetOperation, RemoveOperation } from "../../services/database/operations/baseOperations";
 
 export class SaveTaskStore extends SaveOperation
 {
