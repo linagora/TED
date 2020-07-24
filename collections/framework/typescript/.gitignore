@@ -1,0 +1,8 @@
+node_modules
+build
+coverage
+yarn-error.log
+/src/__tests__/DBState.json
+/src/Config/config.ts
+/src/Config/AmazonRootCA1.pem
+/src/Monitoring/logs/
