@@ -2,7 +2,7 @@ import * as myTypes from "../BaseTools/myTypes";
 import * as template from "../BaseTools/BaseOperations";
 import { createTable } from "../CQL/TableCreation";
 
-export class SaveEventOperation extends template.SaveOperation
+export class SaveEventStore extends template.SaveOperation
 {
   constructor(operation:myTypes.InternalOperationDescription)
   {
@@ -11,7 +11,7 @@ export class SaveEventOperation extends template.SaveOperation
       opID: operation.opID,
       collections: operation.collections,
       documents: operation.documents,
-      encObject: SaveEventOperation.createLog(operation)
+      encObject: SaveEventStore.createLog(operation)
     });
     this.canCreateTable = true;
     this.buildOperation();

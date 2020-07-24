@@ -1,27 +1,28 @@
-import * as CQL from "../BaseTools/BaseOperations";
 import * as myTypes from "./../BaseTools/myTypes";
-import * as secondary from "../TEDOperations/SecondaryProjections";
 import * as myCrypto from "./../BaseTools/CryptographicTools";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
+import { RemoveMainView, getPreviousValue } from "../TEDOperations/MainProjections";
+import { BatchOperation, BaseOperation } from "../BaseTools/BaseOperations";
+import { TStoCQLtypes, getRemoveSecondaryView, createSecondaryInfos } from "../TEDOperations/SecondaryProjections";
 
-export default async function removeRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<CQL.BatchOperation>
+export default async function removeRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<BatchOperation>
 {
     globalCounter.inc("remove_precompute");
     let timer = new Timer("remove_precompute");
-    let opArray:CQL.BaseOperation[] = [];
+    let opArray:BaseOperation[] = [];
     if(opDescriptor.collections.length === opDescriptor.documents.length)
     {
-        opArray.push(new CQL.RemoveOperation(opDescriptor));
-        let previousValueEnc = await secondary.getPreviousValue(opDescriptor);
+        opArray.push(new RemoveMainView(opDescriptor));
+        let previousValueEnc = await getPreviousValue(opDescriptor);
         tracker?.endStep("secondary_table_read");
-        if(previousValueEnc === null) return new CQL.BatchOperation([]);
+        if(previousValueEnc === null) return new BatchOperation([], false);
         let previousValue:myTypes.ServerSideObject = myCrypto.decryptData(previousValueEnc, myCrypto.globalKey);
         Object.entries(previousValue).forEach( ([key, value]) =>
         {
-            if(secondary.TStoCQLtypes.get(typeof(value)) !== undefined)
+            if(TStoCQLtypes.get(typeof(value)) !== undefined)
             {
-                opArray.push(secondary.getRemoveOperationSecondaryIndex(opDescriptor, secondary.createSecondaryInfos(previousValue, key)));
+                opArray.push(getRemoveSecondaryView(opDescriptor, createSecondaryInfos(previousValue, key)));
             }
         })
     }
@@ -30,5 +31,5 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
         //TODO drop collection
     }
     timer.stop();
-    return new CQL.BatchOperation(opArray);
+    return new BatchOperation(opArray, false);
 }

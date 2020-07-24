@@ -78,7 +78,7 @@ export abstract class SaveOperation extends BaseOperation
     if(request.encObject === undefined) throw new Error("Missing field object for a save operation");
     this.action = myTypes.action.save;
     this.object = request.encObject;
-    this.options = request.options;
+    this.options = request.options as myTypes.SaveOptions;
   }
 
   protected buildOperation():void
@@ -147,7 +147,7 @@ export abstract class RemoveOperation extends BaseOperation
   }
 };
 
-export abstract class BatchOperation implements myTypes.GenericOperation
+export class BatchOperation implements myTypes.GenericOperation
 {
   action:myTypes.action;
   operationsArray:BaseOperation[];

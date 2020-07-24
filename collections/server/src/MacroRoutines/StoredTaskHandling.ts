@@ -2,11 +2,11 @@ import * as myTypes from "../BaseTools/myTypes";
 import * as config from "./../Config/config";
 import * as messageBroker from "./../MessageBroker/MessageBrokerInterface";
 import { GetTaskStore, RemoveTaskStore } from "../TEDOperations/TaskStore";
-import { processPath, runWriteOperation, buildPath } from "./RequestHandling";
+import { runWriteOperation } from "./RequestHandling";
 import { globalCounter } from "./../index";
 import { Timer, RequestTracker } from "./../Monitoring/Timer";
 import { tableCreationError } from "../BaseTools/BaseOperations";
-import { delay } from "./../BaseTools/divers";
+import { delay, buildPath, processPath } from "./../BaseTools/divers";
 
 export let mbInterface:messageBroker.TaskBroker|null;
 
@@ -53,15 +53,11 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
         opID: "null",
         collections: processedPath.collections,
         documents: processedPath.documents,
-        tableOptions: {
-            secondaryTable: false,
-            tableName: "global_taskstore"
-        },
         keyOverride: {
             path: path,
         },
         options: {
-            order: "op_id ASC",
+            order: [{key: "op_id", order: "ASC"}],
             limit: config.ted.taskStoreBatchSize
         }
     })
@@ -76,7 +72,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
     {
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
         let tracker = new RequestTracker({
-            action: myTypes.action.projection,
+            action: opDescriptor.action,
             path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
         }, "projection");
         await runWriteOperation(opDescriptor, tracker);
@@ -96,7 +92,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
         if(err === tableCreationError && retry)
         {
             await delay(10000);
-            runPendingOperation(opLog, true);
+            return runPendingOperation(opLog, true);
         }
         else throw err;
     }
