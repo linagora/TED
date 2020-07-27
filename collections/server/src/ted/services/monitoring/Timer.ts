@@ -60,7 +60,7 @@ export class Timer
     key:string;
     start:number;
     static logMap:TimerLogsMap;
-s
+
     constructor(key:string)
     {
         this.key = key;
