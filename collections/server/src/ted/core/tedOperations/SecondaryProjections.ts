@@ -184,7 +184,7 @@ export function getGetSecondaryView(operation:myTypes.InternalOperationDescripti
         opID: operation.opID,
         collections: operation.collections,
         documents: operation.documents,
-        secondaryInfos: where === undefined ? operation.secondaryInfos : where,
+        secondaryInfos: operation.secondaryInfos !== undefined ? operation.secondaryInfos : where,
     });
     return op;
 }

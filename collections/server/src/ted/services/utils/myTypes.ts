@@ -54,6 +54,7 @@ export type ServerBaseRequest = {
   order?:Order;
   limit?:number;
   pageToken?:string;
+  where?:WhereClause
 };
 
 export type InternalOperationDescription = {
@@ -68,7 +69,6 @@ export type InternalOperationDescription = {
   tableOptions?:TableOptions;
   secondaryInfos?:SecondaryInfos;
   keyOverride?:DBentry;
-  where?:WhereClause;
 };
 
 export type ServerAnswer = {
@@ -85,9 +85,11 @@ export type CQLResponseError = {
   query:string;
 };
 
+export type Param = string | string[];
+
 export type Query = {
   query:string;
-  params:string[];
+  params:Param[];
 };
 
 export type QueryResult = {
@@ -166,5 +168,5 @@ export type CQLOperationInfos = {
   action:action,
   keys:DBentry,
   table:string,
-  options?:SaveOptions | GetOptions
+  options?:SaveOptions | GetOptions,
 }

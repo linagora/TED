@@ -105,13 +105,15 @@ export class CQLSaveOperation extends CQLBaseOperation
 
 export class CQLGetOperation extends CQLBaseOperation
 {
-  options:myTypes.GetOptions
+  options:myTypes.GetOptions;
+  where?:myTypes.WhereClause;
   pageToken?:string;
 
   constructor(infos:myTypes.CQLOperationInfos)
   {
     super(infos);
     this.options = infos.options as myTypes.GetOptions;
+    if(this.options !== undefined) this.where = this.options.where;
     this.buildQuery();
   }
 
@@ -128,20 +130,21 @@ export class CQLGetOperation extends CQLBaseOperation
   {
     let primaryKey:myTypes.Query = this.buildPrimaryKey();
     let res:string[] = ["SELECT JSON * FROM", this.table];
-    let params:string[] = [];
+    let params:myTypes.Param[] = [];
     if(primaryKey.params.length > 0)
     {
       res.push("WHERE");
       res.push(primaryKey.query);
       params = primaryKey.params;
     }
-    if(this.options.where !== undefined)
+    if(this.where !== undefined)
     {
-      res.push("AND");
-      res.push(this.options.where.field);
-      res.push(this.options.where.operator);
+      if(primaryKey.params.length > 0) res.push("AND");
+      else res.push("WHERE");
+      res.push(this.where.field);
+      res.push(this.where.operator);
       res.push("?");
-      params.push(this.options.where.value.toString());
+      params.push(this.where.value);
     }
     if(this.options.order !== undefined)
     {

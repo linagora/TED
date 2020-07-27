@@ -3,13 +3,13 @@ import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
 import getRoutine from "./GetRoutine";
 import * as myCrypto from "../../services/utils/cryptographicTools";
-import { SaveTaskStore } from "../../services/database/operations/tedOperations/TaskStore";
+import { SaveTaskStore } from "../tedOperations/TaskStore";
 import { BatchOperation, tableCreationError } from "../../services/database/operations/baseOperations";
 import { mbInterface } from "./StoredTaskHandling";
 import { v1 as uuidv1 } from "uuid";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";
 import { processPath, delay, truncatePath } from "../../services/utils/divers";
-import { SaveEventStore } from "../../services/database/operations/tedOperations/EventsTable";
+import { SaveEventStore } from "../tedOperations/EventsTable";
 
 export async function createOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.GenericOperation>
 {
@@ -55,6 +55,11 @@ export function getInternalOperationDescription(request:myTypes.ServerBaseReques
         collections: processedPath.collections,
         clearObject: request.object,
         options: request.options,
+        secondaryInfos: request.where === undefined ? undefined : {
+            secondaryKey: request.where.field,
+            secondaryValue: request.where.value,
+            operator: request.where.operator
+        }
     }
     return opDescriptor;
 }
@@ -69,21 +74,26 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
         case myTypes.action.save:
         case myTypes.action.remove:
         {
+            let totalResponseTime = new Timer("write_request");
             tracker?.updateLabel("taskstore_write")
             await logEvent(opDescriptor, tracker);
             tracker?.endStep("taskstore_write");
             if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path), opDescriptor.opID);
             tracker?.endStep("broker_write");
             tracker?.log();
+            totalResponseTime.stop();
             return {status: "Success"};
         }
         case myTypes.action.get:
         {
+            let totalResponseTime = new Timer("read_request");
+            tracker?.updateLabel("read_operation");
             let res = await runReadOperation(opDescriptor, tracker);
             tracker?.endStep("cassandra_read")
             myCrypto.decryptResult(res, myCrypto.globalKey);
             tracker?.endStep("decryption");
-            tracker?.log()
+            tracker?.log();
+            totalResponseTime.stop();
             return res;
         }
         default:
@@ -122,6 +132,7 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
             let op = await saveRoutine(opDescriptor, tracker);
             tracker?.endStep("operation_computation")
             await op.execute();
+            tracker?.endStep("cassandra_write");
             break;
         }
         case myTypes.action.remove:
@@ -130,6 +141,7 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
             let op = await removeRoutine(opDescriptor, tracker);
             tracker?.endStep("operation_computation")
             await op.execute();
+            tracker?.endStep("cassandra_write");
             break;
         }
         default:
