@@ -76,7 +76,7 @@ export async function setup():Promise<void>
 
 const defaultQueryOptions:cassandra.QueryOptions = {
   prepare: true,
-  consistency: types.consistencies.localQuorum
+  //consistency: types.consistencies.localQuorum
 }
 
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>

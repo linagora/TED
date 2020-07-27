@@ -45,7 +45,8 @@ export class TimerLogsMap
             this.logs[key] = [];
             this.prom_logs[key] = new prometheus.Histogram({
                 name: "custom_histogram_" + key,
-                help: "a custom timer histogram related to " + key
+                help: "a custom timer histogram related to " + key,
+                buckets: [5,10,20,30,40,50,75,100,150,200,300,500,1000,5000]
             });
         }
         this.logs[key].push(time);
@@ -59,7 +60,7 @@ export class Timer
     key:string;
     start:number;
     static logMap:TimerLogsMap;
-
+s
     constructor(key:string)
     {
         this.key = key;
@@ -75,7 +76,7 @@ export class Timer
 }
 
 export class RequestTrackerLog
-{
+{   
     logs:TimeTrackerLog;
     prom_logs:promSumMap;
 

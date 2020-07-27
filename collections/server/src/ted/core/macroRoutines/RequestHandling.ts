@@ -95,7 +95,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
 
 export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
 {
-    let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], false);
+    let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], true);
     try
     {
         await opWrite.execute();
