@@ -2,8 +2,8 @@ import * as myTypes from "../../services/utils/myTypes";
 import { forwardCollection } from "./StoredTaskHandling";
 import { globalCounter } from "../../index";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";
-import { GetMainView } from "../../services/database/operations/tedOperations/MainProjections";
-import { getGetSecondaryView } from "../../services/database/operations/tedOperations/SecondaryProjections";
+import { GetMainView } from "../tedOperations/MainProjections";
+import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
 
 export let EmptyResultError = new Error("No matching object found");
 
@@ -13,12 +13,10 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     let timer = new Timer("get_precompute");
     await forwardCollection(opDescriptor);
     tracker?.endStep("collection_update");
-
     if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new GetMainView(opDescriptor);
     try
     {
-        let options = opDescriptor.options as myTypes.GetOptions;
-        if(options.where === undefined) return new GetMainView(opDescriptor);
+        if(opDescriptor.secondaryInfos === undefined) return new GetMainView(opDescriptor);
 
         let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
         tracker?.endStep("secondary_table_read");
@@ -30,6 +28,7 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     catch(err)
     {
         if(err === EmptyResultError) throw err;
+        console.log(err);
         return new GetMainView(opDescriptor);
     }
 }
@@ -57,10 +56,10 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
         documents: opDescriptor.documents,
         collections: opDescriptor.collections,
         options: {
-            where: {
-            field: opDescriptor.collections.slice(-1)[0],
-            value: matchingIDs,
-            operator: myTypes.Operator.in
+            where:{
+                field: opDescriptor.collections.slice(-1)[0],
+                value: matchingIDs,
+                operator: myTypes.Operator.in
             }
         }
     });

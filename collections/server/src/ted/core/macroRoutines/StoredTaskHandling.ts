@@ -1,7 +1,7 @@
 import * as myTypes from "../../services/utils/myTypes";
 import * as config from "../../../config/config";
 import * as messageBroker from "../../services/messageBroker/MessageBrokerInterface";
-import { GetTaskStore, RemoveTaskStore } from "../../services/database/operations/tedOperations/TaskStore";
+import { GetTaskStore, RemoveTaskStore } from "../tedOperations/TaskStore";
 import { runWriteOperation } from "./RequestHandling";
 import { globalCounter } from "../../index";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";

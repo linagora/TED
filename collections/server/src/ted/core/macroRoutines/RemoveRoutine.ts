@@ -2,9 +2,9 @@ import * as myTypes from "../../services/utils/myTypes";
 import * as myCrypto from "../../services/utils/cryptographicTools";
 import { globalCounter } from "../../index";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";
-import { RemoveMainView, getPreviousValue } from "../../services/database/operations/tedOperations/MainProjections";
+import { RemoveMainView, getPreviousValue } from "../tedOperations/MainProjections";
 import { BatchOperation, BaseOperation } from "../../services/database/operations/baseOperations";
-import { TStoCQLtypes, getRemoveSecondaryView, createSecondaryInfos } from "../../services/database/operations/tedOperations/SecondaryProjections";
+import { TStoCQLtypes, getRemoveSecondaryView, createSecondaryInfos } from "../tedOperations/SecondaryProjections";
 
 export default async function removeRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<BatchOperation>
 {

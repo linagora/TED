@@ -7,8 +7,8 @@ function randint(min:number, max:number) { // min and max included
     return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
-const mminDepth = 2;
-const maxDepth = 2;
+const mminDepth = 1;
+const maxDepth = 1;
 
 type map = {
     [key:string]:Object
@@ -87,6 +87,32 @@ export async function getObject(path:string):Promise<Object>
         throw new Error("Missing results\n");
     }
     return response.data.queryResults.allResultsClear[0].object;
+}
+
+export async function getObjectWhere(path:string, key:string, value:number):Promise<Object[]>
+{
+    const response = await post("http://localhost:8080", {
+        data: {
+            action: "get",
+            path: path,
+            where:{
+                operator:"=",
+                field:key,
+                value:value
+            }
+        }
+    })
+    if(response.data.queryResults === undefined) 
+    {
+        console.log(response.data);
+        throw new Error("Response error\n");
+    }
+    if(response.data.queryResults.allResultsClear === undefined) 
+    {
+        console.log(response.data);
+        throw new Error("Missing results\n");
+    }    
+    return response.data.queryResults.allResultsClear;
 }
 
 export async function writeFusion():Promise<void>

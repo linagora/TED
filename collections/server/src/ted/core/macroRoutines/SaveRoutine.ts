@@ -2,8 +2,8 @@ import * as myTypes from "../../services/utils/myTypes";
 import * as myCrypto from "../../services/utils/cryptographicTools";
 import { globalCounter } from "../../index";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";
-import { getPreviousValue, SaveMainView } from "../../services/database/operations/tedOperations/MainProjections";
-import { getSaveSecondaryView, TStoCQLtypes, removePreviousValue, createSecondaryInfos } from "../../services/database/operations/tedOperations/SecondaryProjections";
+import { getPreviousValue, SaveMainView } from "../tedOperations/MainProjections";
+import { getSaveSecondaryView, TStoCQLtypes, removePreviousValue, createSecondaryInfos } from "../tedOperations/SecondaryProjections";
 import { tableCreationError, BaseOperation, BatchOperation } from "../../services/database/operations/baseOperations";
 
 const noPreviousValue:Error = new Error("Unable to find a previous value");

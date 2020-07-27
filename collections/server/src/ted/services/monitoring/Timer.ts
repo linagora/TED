@@ -46,7 +46,7 @@ export class TimerLogsMap
             this.prom_logs[key] = new prometheus.Histogram({
                 name: "custom_histogram_" + key,
                 help: "a custom timer histogram related to " + key,
-                buckets: [5,10,20,30,40,50,75,100,150,200,300,500,1000,5000]
+                buckets: [2,5,10,25,50,75,150,300,500,1000,5000,10000]
             });
         }
         this.logs[key].push(time);
@@ -78,12 +78,14 @@ export class Timer
 export class RequestTrackerLog
 {   
     logs:TimeTrackerLog;
-    prom_logs:promSumMap;
+    prom_logs_sum:promSumMap;
+    prom_logs_hist:promHistMap;
 
     constructor()
     {
         this.logs = {};
-        this.prom_logs = {};
+        this.prom_logs_sum = {};
+        this.prom_logs_hist={};
         /* readFile("src/Monitoring/logs/request_tracker.json", "utf8", (err, data) => 
         {
             if(err) return err;
@@ -101,15 +103,25 @@ export class RequestTrackerLog
         Object.entries(tracker.logs).forEach(([key, value]) => 
         {
             console.log(key, value);
-            if(this.prom_logs[key] === undefined)
+            if(this.prom_logs_sum[key] === undefined)
             {
-                this.prom_logs[key] = new prometheus.Summary({
+                this.prom_logs_sum[key] = new prometheus.Summary({
                     name: "custom_summary_tracker_" + key,
                     help: "a custom summary to record the time of " +  key,
-                    labelNames: ["operation_description"]
+                    labelNames: ["operation_description"],
                 })
             }
-            this.prom_logs[key].observe({operation_description: label}, value);
+            this.prom_logs_sum[key].observe({operation_description: label}, value);
+            if(this.prom_logs_hist[key] === undefined)
+            {
+                this.prom_logs_hist[key] = new prometheus.Histogram({
+                    name: "custom_histogram_tracker_" + key,
+                    help: "a custom summary to record the time of " +  key,
+                    labelNames: ["operation_description"],
+                    buckets: [2,5,10,25,50,75,150,300,500,1000,5000,10000]
+                })
+            }
+            this.prom_logs_hist[key].observe({operation_description: label}, value);
         })
         this.logs[label].push(tracker.logs);
         //writeFile("src/Monitoring/logs/request_tracker.json", JSON.stringify(this.logs), "utf8", ()=>{});
