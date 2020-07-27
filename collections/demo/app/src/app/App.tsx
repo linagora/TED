@@ -3,6 +3,8 @@ import Channels from "./Channels";
 import Messages from "./Messages";
 import "./App.css";
 
+import db from "twake-collections-client";
+
 function App() {
   return (
     <div className="App">
