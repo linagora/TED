@@ -76,6 +76,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
             path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
         }, "projection");
         await runWriteOperation(opDescriptor, tracker);
+        tracker.updateLabel("stored_write_operation");
         tracker.endStep("cassandra_write");
         let rmDescriptor = {...opDescriptor};
         rmDescriptor.keyOverride = {
