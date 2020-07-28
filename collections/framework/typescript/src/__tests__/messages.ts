@@ -1,4 +1,5 @@
 import express from "express";
+import socketcluster from "socketcluster-client";
 import TED, { HttpError } from "../index";
 
 // First connect to TED and set options
