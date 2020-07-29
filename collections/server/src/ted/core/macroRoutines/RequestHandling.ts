@@ -45,9 +45,9 @@ export async function createOperation(opDescriptor:myTypes.InternalOperationDesc
     }
 };
 
-export function getInternalOperationDescription(request:myTypes.ServerBaseRequest):myTypes.InternalOperationDescription
+export function getInternalOperationDescription(request:myTypes.ServerRequestBody, path:string):myTypes.InternalOperationDescription
 {
-    let processedPath = processPath(request.path);
+    let processedPath = processPath(path);
     let opDescriptor:myTypes.InternalOperationDescription = {
         action: request.action,
         opID: uuidv1(),
@@ -64,9 +64,9 @@ export function getInternalOperationDescription(request:myTypes.ServerBaseReques
     return opDescriptor;
 }
 
-export default async function handleRequest(request:myTypes.ServerBaseRequest, tracker?:RequestTracker ):Promise<myTypes.ServerAnswer>
+export default async function handleRequest(request:myTypes.ServerRequestBody, path:string, tracker?:RequestTracker ):Promise<myTypes.ServerAnswer>
 {
-    let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request);
+    let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request, path);
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
     tracker?.endStep("encryption");
     switch(opDescriptor.action)
@@ -78,7 +78,7 @@ export default async function handleRequest(request:myTypes.ServerBaseRequest, t
             tracker?.updateLabel("taskstore_write")
             await logEvent(opDescriptor, tracker);
             tracker?.endStep("taskstore_write");
-            if(mbInterface !== null) await mbInterface.pushTask(truncatePath(request.path), opDescriptor.opID);
+            if(mbInterface !== null) await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
             tracker?.endStep("broker_write");
             tracker?.log();
             totalResponseTime.stop();

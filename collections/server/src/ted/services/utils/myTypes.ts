@@ -46,9 +46,14 @@ export type Order = {
   order:"ASC" | "DESC"
 };
 
-export type ServerBaseRequest = {
-  action: action;
+export type ServerRequest = {
   path:string;
+  body:ServerRequestBody;
+  originalRequest:any;
+}
+
+export type ServerRequestBody = {
+  action: action;
   object?:ServerSideObject;
   options?:SaveOptions | GetOptions;
   order?:Order;

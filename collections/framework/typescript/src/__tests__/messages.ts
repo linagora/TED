@@ -1,29 +1,29 @@
 import express from "express";
-import socketcluster from "socketcluster-client";
 import TED, { HttpError } from "../index";
 
+let ted = new TED();
+
 // First connect to TED and set options
-TED.connect({
-  options1: "",
-  options2: "",
-  credentials: {
-    user: "",
-    password: ""
-  }
+ted.connect({
+  username: "",
+  password: ""
 });
+
 
 //We suppose we are in an existing application,
 //so TED must be triggered with specific routes
 const app = express();
+app.use(express.json());
 app.all("/api/collections/*", async function(
   req: express.Request,
   res: express.Response
 ) {
-  let collectionPath = req.method.replace("/api/collections/", "");
-
+  console.log(1);
+  let collectionPath = req.url.replace("/api/collections/", "");
+  console.log(req.body);
   //TED request should be as generic as possible
   // to be compatible with other Apis than express
-  const response: any = await TED.request({
+  const response: any = await ted.request({
     path: collectionPath,
     body: req.body,
     originalRequest: req
@@ -33,7 +33,7 @@ app.all("/api/collections/*", async function(
   res.send(response);
 });
 
-TED.beforeSave(
+ted.pushBeforeSave(
   "companies/channels/messages",
   (object: any, originalRequest: express.Request) => {
     object.date = new Date().getTime();
@@ -50,11 +50,13 @@ TED.beforeSave(
   }
 );
 
-TED.afterSave(
+app.listen(9000);
+
+/* ted.pushAfterSave(
   "companies/channels/messages",
-  (objectBefore: any, objectAfter: any) => {
+  async (objectBefore: any, objectAfter: any) => {
     if (objectBefore === null) {
-      let channel = await TED.document("companies/channels", [
+      let channel = await ted.document("companies/channels", [
         "company-3",
         "channel-12"
       ]);
@@ -64,4 +66,4 @@ TED.afterSave(
       await channel.save();
     }
   }
-);
+); */

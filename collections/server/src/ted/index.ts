@@ -10,7 +10,7 @@ import { setup as promSetup } from "./services/monitoring/PrometheusClient";
 import * as config from "../config/config";
 import * as promClient from "prom-client";
 
-import * as scServer   from "socketcluster-server";
+import { setup as setupSocketcluster } from "./services/socketcluster/socketclusterServer";
 
 export let globalTimerLogs:TimerLogsMap;
 export let globalCounter:CounterMap;
@@ -34,7 +34,7 @@ async function setup():Promise<void>
   await cassandraSetup();
 }
 
-async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerBaseRequest>
+async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerRequestBody>
 {
   return new Promise((resolve, reject) => 
   {
@@ -78,7 +78,7 @@ async function main():Promise<void>
   });
 
   console.log("Initializing http server");
-  http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
+  let httpServer = http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
   {
     try{
       if(req.url === "/metrics")
@@ -88,11 +88,11 @@ async function main():Promise<void>
       }
       console.log("\n\n ===== New Incoming Request =====");
       let httpTimer = new Timer("http_response");
-      let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
-      let tracker = new RequestTracker(operation, "");
+      let operation:myTypes.ServerRequestBody = await getHTTPBody(req);
+      let tracker = new RequestTracker("");
       try
       {
-        let answer = await handleRequest(operation, tracker);
+        let answer = await handleRequest(operation, "", tracker);
         res.write(JSON.stringify(answer));
         res.end();
       }
@@ -107,40 +107,9 @@ async function main():Promise<void>
     catch(err){
       console.error(err);
     }
-  }).listen(8080);
+  });
+  setupSocketcluster(httpServer);
+  httpServer.listen(8080);
   initTimer.stop();
 }
-
-
-let httpServer = http.createServer();
-let agServer = scServer.attach(httpServer);
-(async () => {
-  // Handle new inbound sockets.
-  for await (let {socket} of agServer.listener('connection')) {
-
-    (async () => {
-      // Set up a loop to handle and respond to RPCs for a procedure.
-      for await (let req of socket.procedure('customProc')) {
-        console.log(req);
-        if (req.data.bad) {
-          let error = new Error('Server failed to execute the procedure');
-          error.name = 'BadCustomError';
-          req.error(error);
-        } else {
-          req.end('Success');
-        }
-      }
-    })();
-
-    (async () => {
-      // Set up a loop to handle remote transmitted events.
-      for await (let data of socket.receiver('customRemoteEvent')) {
-        console.log(data);
-      }
-    })();
-
-  }
-})();
-
-httpServer.listen(8000);
-//main();
+main();

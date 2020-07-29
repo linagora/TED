@@ -71,10 +71,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
     try
     {
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
-        let tracker = new RequestTracker({
-            action: opDescriptor.action,
-            path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
-        }, "projection");
+        let tracker = new RequestTracker("projection");
         await runWriteOperation(opDescriptor, tracker);
         tracker.updateLabel("stored_write_operation");
         tracker.endStep("cassandra_write");
