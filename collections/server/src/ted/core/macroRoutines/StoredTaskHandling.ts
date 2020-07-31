@@ -7,6 +7,10 @@ import { globalCounter } from "../../index";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";
 import { tableCreationError } from "../../services/database/operations/baseOperations";
 import { delay, buildPath, processPath } from "../../services/utils/divers";
+import * as myCrypto from "../../services/utils/cryptographicTools";
+import { GetMainView } from "../tedOperations/MainProjections";
+import { sendToSocket } from "../../services/socket/sockectServer";
+import { Organizations } from "aws-sdk";
 
 export let mbInterface:messageBroker.TaskBroker|null;
 
@@ -73,6 +77,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
         let tracker = new RequestTracker("projection");
         await runWriteOperation(opDescriptor, tracker);
+        sendToAfterSave(opDescriptor);
         tracker.updateLabel("stored_write_operation");
         tracker.endStep("cassandra_write");
         let rmDescriptor = {...opDescriptor};
@@ -144,4 +149,38 @@ export async function fastForwardTaskStore():Promise<void>
         let path = buildPath(opDescriptor.collections, opDescriptor.documents, true)
         await mbInterface.pushTask(path, opDescriptor.opID);
     }
+}
+
+export async function sendToAfterSave(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+{
+    return new Promise(async (resolve, reject) => 
+    {
+        try{
+            console.log("ICIIIII", opDescriptor);
+            if(opDescriptor.afterSave === undefined) resolve();
+            else
+            {
+                console.log("LAAAAAAAA");
+                let getOp = new GetMainView({
+                    action: myTypes.action.get,
+                    opID: opDescriptor.opID,
+                    collections: opDescriptor.collections,
+                    documents: opDescriptor.documents
+                });
+                let res = await getOp.execute()
+                myCrypto.decryptResult(res, myCrypto.globalKey);
+                console.log(res.queryResults);
+                if(res.queryResults?.allResultsClear === undefined) throw new Error("Unable to find the created object");
+                let ans:myTypes.ServerSideObject = {};
+                ans["object"] = res.queryResults.allResultsClear[0].object as myTypes.ServerSideObject;
+                ans["path"] = buildPath(opDescriptor.collections, opDescriptor.documents, false);
+                ans["originalRequest"] = opDescriptor.afterSave.originalRequest;
+                await sendToSocket("afterSave", ans, opDescriptor.afterSave);
+                resolve();
+            }
+        }
+        catch(err){
+            reject(err);
+        }        
+    });
 }

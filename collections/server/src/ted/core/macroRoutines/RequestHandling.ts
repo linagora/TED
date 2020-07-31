@@ -45,8 +45,9 @@ export async function createOperation(opDescriptor:myTypes.InternalOperationDesc
     }
 };
 
-export function getInternalOperationDescription(request:myTypes.ServerRequestBody, path:string):myTypes.InternalOperationDescription
+export function getInternalOperationDescription(request:myTypes.ServerRequestBody, path:string, afterSaveInfos?:myTypes.AfterSaveInfos):myTypes.InternalOperationDescription
 {
+    console.log(request);
     let processedPath = processPath(path);
     let opDescriptor:myTypes.InternalOperationDescription = {
         action: request.action,
@@ -59,14 +60,15 @@ export function getInternalOperationDescription(request:myTypes.ServerRequestBod
             secondaryKey: request.where.field,
             secondaryValue: request.where.value,
             operator: request.where.operator
-        }
+        },
+        afterSave:afterSaveInfos
     }
     return opDescriptor;
 }
 
-export default async function handleRequest(request:myTypes.ServerRequestBody, path:string, tracker?:RequestTracker ):Promise<myTypes.ServerAnswer>
+export default async function handleRequest(request:myTypes.ServerRequestBody, path:string, afterSaveInfos?:myTypes.AfterSaveInfos, tracker?:RequestTracker ):Promise<myTypes.ServerAnswer>
 {
-    let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request, path);
+    let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request, path, afterSaveInfos);
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
     tracker?.endStep("encryption");
     switch(opDescriptor.action)
@@ -105,6 +107,7 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
 
 export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
 {
+    console.log(opDescriptor);
     let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], true);
     try
     {

@@ -1,6 +1,6 @@
 import * as amqp from "amqplib";
 import { SQS } from "aws-sdk";
-import { sqs } from "../../../config/config";
+import { sqs, rabbitmq } from "../../../config/config";
 import { delay } from "../utils/divers";
 
 type ExternalResolver = {
@@ -76,6 +76,7 @@ export class RabbitMQBroker extends TaskBroker
                     this.channel?.ack(msg);
                 }
                 catch(err){
+                    await delay(rabbitmq.rejectionTimeout);
                     this.channel?.reject(msg);
                 }
                 

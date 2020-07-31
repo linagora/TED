@@ -10,7 +10,7 @@ import { setup as promSetup } from "./services/monitoring/PrometheusClient";
 import * as config from "../config/config";
 import * as promClient from "prom-client";
 
-import { setup as setupSocketcluster } from "./services/socketcluster/socketclusterServer";
+import { setup as setupSocketcluster } from "./services/socket/sockectServer";
 
 export let globalTimerLogs:TimerLogsMap;
 export let globalCounter:CounterMap;
@@ -92,7 +92,7 @@ async function main():Promise<void>
       let tracker = new RequestTracker("");
       try
       {
-        let answer = await handleRequest(operation, "", tracker);
+        let answer = await handleRequest(operation, "", undefined, tracker);
         res.write(JSON.stringify(answer));
         res.end();
       }

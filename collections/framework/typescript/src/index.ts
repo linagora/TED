@@ -1,15 +1,15 @@
-import socketcluster from "socketcluster-client";
-import { cpuUsage } from "process";
+import socketIO from "socket.io-client";
 
-const PORT = 8000;
+const PORT = 8080;
 const HOSTNAME = "localhost";
+const TED_URL = "http://localhost:8080";
 
 type Credentials = {
   username:string,
   password:string
 }
 
-type Process = (object:any, originalRequest:any) => any;
+type Process = (object:Object, request:any) => Object;
 
 type ProcessMap = {
   [path:string]:Process;
@@ -18,48 +18,84 @@ type ProcessMap = {
 export default class TED {
   beforeSaves:ProcessMap = {};
   afterSaves:ProcessMap = {};
-  socket:socketcluster.AGClientSocket;
+  socket:SocketIOClient.Socket;
 
   constructor()
   {
-    this.socket = socketcluster.create({
-      hostname: HOSTNAME,
-      port: PORT
-    });
+    this.socket = socketIO(TED_URL);
   }
 
   /* Request from HTTP */
   public async connect(credentials:Credentials):Promise<void>
   {
-    try{
-      //await this.socket.invoke("login", credentials);
-      console.log("Connection successful");
-    }
-    catch(err){
-      console.log("Unable to connect");
-      console.error(err);
-    }
+    this.socket.on("disconnect", (reason:string) => 
+    {
+      console.log("disconnected, trying to reconnect");
+      if(reason === "io server disconnected") this.socket.connect();
+    });
 
+    this.socket.on("connect", () =>
+    {
+      this.socket.emit("login", credentials, (result:any) =>
+      {
+        console.log(result);
+      });
+    });
+
+    this.socket.on("afterSave", (data:any, ack:any) =>
+    {
+      console.log(data);
+      ack();
+      let collectionPath = TED.getCollectionPath(data.path);
+      if(this.afterSaves[collectionPath] !== undefined)
+      {
+        this.afterSaves[collectionPath](data.object, data.originalRequest);
+      } 
+    })
   }
 
   /* Request from HTTP */
-  public async request(data: any):Promise<any>
+  public async save(data: any):Promise<any>
   {
     let collectionPath = TED.getCollectionPath(data.path);
     if(this.beforeSaves[collectionPath] !== undefined)
     {
       data.body = this.beforeSaves[collectionPath](data.body, data.originalRequest);
     }
-    try{
-      console.log("sending");
-      let result = await this.socket.invoke("aaa", data);
-      console.log(result);
-      return result;
+    if(this.afterSaves[collectionPath] !== undefined || true)
+    {
+      data.afterSave = true;
     }
-    catch(err){
-      console.error(err);
-    }
+    return this.request(data)
+  }
 
+  public async get(data:any):Promise<any>
+  {
+    return this.request(data);
+  }
+
+  public async remove(data:any):Promise<any>
+  {
+    return this.request(data);
+  }
+
+  private async request(request:any):Promise<any>
+  {
+    return new Promise((resolve, reject) =>
+    {
+      try{
+        console.log("sending :", request);
+        this.socket.emit("tedRequest", request, (result:any) => 
+        {
+          console.log(result);
+          resolve(result);
+        });
+      }
+      catch(err){
+        console.error(err);
+        reject(err);
+      }
+    });
   }
 
   /* Create a beforeSave */

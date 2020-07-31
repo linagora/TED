@@ -14,19 +14,70 @@ ted.connect({
 //so TED must be triggered with specific routes
 const app = express();
 app.use(express.json());
-app.all("/api/collections/*", async function(
+app.put("/api/collections/*", async function(
   req: express.Request,
   res: express.Response
-) {
-  console.log(1);
+) 
+{
   let collectionPath = req.url.replace("/api/collections/", "");
+  //TED request should be as generic as possible
+  // to be compatible with other Apis than express
+  const response: any = await ted.save(
+  {
+    path: collectionPath,
+    body: 
+    {
+      action: "save",
+      object: req.body.object
+    },
+    originalRequest: req.rawHeaders
+  });
+
+  //TODO add json response type
+  res.send(response);
+});
+
+app.get("/api/collections/*", async function(
+  req: express.Request,
+  res: express.Response
+) 
+{
+  let path = req.url.replace("/api/collections/", "");
   console.log(req.body);
   //TED request should be as generic as possible
   // to be compatible with other Apis than express
-  const response: any = await ted.request({
-    path: collectionPath,
-    body: req.body,
-    originalRequest: req
+  const response: any = await ted.get(
+  {
+    path: path,
+    body: 
+    {
+      action: "get",
+      where: req.body.where
+    },
+    originalRequest: req.rawHeaders
+  });
+
+  //TODO add json response type
+  res.send(response);
+});
+
+app.delete("/api/collections/*", async function(
+  req: express.Request,
+  res: express.Response
+) 
+{
+  let path = req.url.replace("/api/collections/", "");
+  console.log(req.body);
+  //TED request should be as generic as possible
+  // to be compatible with other Apis than express
+  const response: any = await ted.remove(
+  {
+    path: path,
+    body: 
+    {
+      action: "remove",
+    },
+    originalRequest: req.rawHeaders
   });
 
   //TODO add json response type
