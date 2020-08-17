@@ -1,118 +1,125 @@
-import socketIO from "socket.io-client";
+import TEDServer, { Credentials } from "./TED/TedServer";
+import DB, { TedRequest, SaveRequest, GetRequest, RemoveRequest } from "./TED/DB";
+import BeforeOperation, { BeforeProcess } from "./TED/BeforeOperation";
+import AfterOperation, { AfterProcess } from "./TED/AfterOperation";
+import express from "express";
+import { cpuUsage } from "process";
 
-const PORT = 8080;
-const HOSTNAME = "localhost";
-const TED_URL = "http://localhost:8080";
-
-type Credentials = {
-  username:string,
-  password:string
+export type HTTPSaveBody = 
+{
+  object:Object;
 }
 
-type Process = (object:Object, request:any) => Object;
-
-type ProcessMap = {
-  [path:string]:Process;
+export type HTTPGetBody = 
+{
+  order?:Order;
+  limit?:number;
+  pageToken?:string;
+  where?:WhereClause;
+  advancedSearch:JSON;
 }
-
+type Order = {
+  key:string,
+  order:"ASC" | "DESC"
+}
+type WhereClause = {
+  operator:Operator;
+  key:string;
+  value:any;
+}
+enum Operator
+{
+  eq = "=",
+  diff = "!=",
+  gt = ">",
+  geq = ">=",
+  lt = '<',
+  leq = '<=',
+  in = "IN",
+  notin = "NOT IN"
+}
+  
 export default class TED {
-  beforeSaves:ProcessMap = {};
-  afterSaves:ProcessMap = {};
-  socket:SocketIOClient.Socket;
+
+  before:BeforeOperation;
+  after:AfterOperation;
+  server:TEDServer;
+  db:DB;
 
   constructor()
   {
-    this.socket = socketIO(TED_URL);
+    this.before = new BeforeOperation();
+    this.after = new AfterOperation();
+    this.server = new TEDServer(this.after);
+    this.db = new DB(this.server);
   }
 
-  /* Request from HTTP */
-  public async connect(credentials:Credentials):Promise<void>
+  public bind(app:express.Express, route:string):void
   {
-    this.socket.on("disconnect", (reason:string) => 
+    let that = this;
+    app.route("/api/collections/*")
+    .put(async function (req, res, next)
     {
-      console.log("disconnected, trying to reconnect");
-      if(reason === "io server disconnected") this.socket.connect();
-    });
-
-    this.socket.on("connect", () =>
-    {
-      this.socket.emit("login", credentials, (result:any) =>
-      {
-        console.log(result);
-      });
-    });
-
-    this.socket.on("afterSave", (data:any, ack:any) =>
-    {
-      console.log(data);
-      ack();
-      let collectionPath = TED.getCollectionPath(data.path);
-      if(this.afterSaves[collectionPath] !== undefined)
-      {
-        this.afterSaves[collectionPath](data.object, data.originalRequest);
-      } 
+      let path = req.path.replace("/api/collections/", "");
+      let collectionPath = TED.getCollectionPath(path);
+      let save:HTTPSaveBody = req.body;
+      let after:boolean = that.after.saves[collectionPath] !== undefined;
+      let tedRequest:SaveRequest = {
+        path: path,
+        body:{
+          action:"save",
+          object:save.object
+        },
+        afterSave: after
+      };
+      console.log(path);
+      tedRequest = await that.before.runSave(tedRequest, req);
+      let response = await that.db.save(tedRequest);
+      res.send(response);
     })
-  }
-
-  /* Request from HTTP */
-  public async save(data: any):Promise<any>
-  {
-    let collectionPath = TED.getCollectionPath(data.path);
-    if(this.beforeSaves[collectionPath] !== undefined)
+    .get(async function (req, res, next)
     {
-      data.body = this.beforeSaves[collectionPath](data.body, data.originalRequest);
-    }
-    if(this.afterSaves[collectionPath] !== undefined || true)
+      let path = req.path.replace("/api/collections/", "");
+      let collectionPath = TED.getCollectionPath(path);
+      let get:HTTPGetBody = req.body;
+      let after:boolean = that.after.gets[collectionPath] !== undefined;
+      let tedRequest:GetRequest = {
+        path:path,
+        body:{
+          action:"get",
+          order:get.order,
+          limit:get.limit,
+          pageToken:get.pageToken,
+          where:get.where,
+          advancedSearch:get.advancedSearch
+        },
+        afterGet: after
+      };
+      console.log(path);
+      tedRequest = await that.before.runGet(tedRequest, req);
+      let response = await that.db.get(tedRequest);
+      res.send(response);
+    })
+    .delete(async function(req, res, next)
     {
-      data.afterSave = true;
-    }
-    return this.request(data)
-  }
+      let path = req.path.replace("/api/collections/", "");
+      let collectionPath = TED.getCollectionPath(path);
+      let after:boolean = that.after.removes[collectionPath] !== undefined;
+      let tedRequest:RemoveRequest = {
+        path: path,
+        body:{
+          action:"remove",
+        },
+        afterRemove: after
+      };
 
-  public async get(data:any):Promise<any>
-  {
-    return this.request(data);
-  }
-
-  public async remove(data:any):Promise<any>
-  {
-    return this.request(data);
-  }
-
-  private async request(request:any):Promise<any>
-  {
-    return new Promise((resolve, reject) =>
-    {
-      try{
-        console.log("sending :", request);
-        this.socket.emit("tedRequest", request, (result:any) => 
-        {
-          console.log(result);
-          resolve(result);
-        });
-      }
-      catch(err){
-        console.error(err);
-        reject(err);
-      }
+      tedRequest = await that.before.runRemove(tedRequest, req);
+      let response = await that.db.remove(tedRequest);
+      res.send(response);
     });
   }
 
-  /* Create a beforeSave */
-  public pushBeforeSave(path:string, callback:Process):void
-  {
-    let collectionPath = TED.getCollectionPath(path);
-    this.beforeSaves[collectionPath] = callback;
-  }
-
-  /* Create an afterSave */
-  public pushAfterSave(path:string, callback:Process)
-  {
-    let collectionPath = TED.getCollectionPath(path);
-    this.afterSaves[collectionPath] = callback;
-  }
-
-  protected static getCollectionPath(path:string):string
+  public static getCollectionPath(path:string):string
   {
     let elems = path.split("/");
     let res:string[] = [];

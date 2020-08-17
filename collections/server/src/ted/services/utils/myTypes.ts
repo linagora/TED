@@ -49,7 +49,6 @@ export type Order = {
 export type ServerRequest = {
   path:string;
   body:ServerRequestBody;
-  originalRequest:any;
 }
 
 export type ServerRequestBody = {
