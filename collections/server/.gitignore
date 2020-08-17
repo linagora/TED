@@ -2,6 +2,7 @@ node_modules
 build
 coverage
 yarn-error.log
+src/config/ssl/
 /src/__tests__/DBState.json
 /src/config/config.ts
 /src/config/AmazonRootCA1.pem

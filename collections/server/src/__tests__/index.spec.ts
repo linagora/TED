@@ -18,7 +18,7 @@ async function writeAndRead():Promise<void>
     let saveOps:Promise<void>[] = [];
     for (let i:number = 0; i<500; i++)
     {
-        await delay(10);
+        await delay(1000);
         saveOps.push(saveObject(randomObject()));
         //await saveObject(randomObject());
     }

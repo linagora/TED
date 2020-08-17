@@ -1,12 +1,12 @@
 import socketIO from "socket.io";
-import http from "http";
+import https from "https";
 import { login, tedRequest } from "./procedures";
 import { delay } from "../utils/divers";
 import * as myTypes from "../utils/myTypes";
 
 let io:socketIO.Server;
 
-export async function setup(httpServer:http.Server):Promise<void>
+export async function setup(httpServer:https.Server):Promise<void>
 {
     io = socketIO(httpServer);
     io.on("connection", (socket) => 
@@ -39,7 +39,6 @@ export async function sendToSocket(event:string, data:any, afterSaveInfos:myType
         try{
             console.log("sending afterSave");
             let socket = io.sockets.connected[afterSaveInfos.senderID];
-            console.log(data);
             socket.emit(event, data, () => resolve());
         }
         catch(err){

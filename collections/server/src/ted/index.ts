@@ -1,4 +1,6 @@
-import * as http from "http";
+import https from "https";
+import http from "http";
+import fs from "fs";
 import handleRequest from "./core/macroRoutines/RequestHandling";
 import * as myTypes from "./services/utils/myTypes";
 import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./core/macroRoutines/StoredTaskHandling";
@@ -34,7 +36,7 @@ async function setup():Promise<void>
   await cassandraSetup();
 }
 
-async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerRequestBody>
+async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerRequest>
 {
   return new Promise((resolve, reject) => 
   {
@@ -77,22 +79,31 @@ async function main():Promise<void>
     throw err;
   });
 
-  console.log("Initializing http server");
-  let httpServer = http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
+  console.log("Initializing https server");
+  let metricServer = http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
+  {
+    if(req.url === "/metrics")
+    {
+      res.end(promClient.register.metrics());
+      return;
+    }
+  });
+  metricServer.listen(8081);
+
+  let httpServer = https.createServer({
+    key: fs.readFileSync("src/config/ssl/key.pem"),
+    cert: fs.readFileSync("src/config/ssl/cert.pem"),
+    requestCert: false,
+    rejectUnauthorized: false}, async function(req: http.IncomingMessage, res: http.OutgoingMessage)
   {
     try{
-      if(req.url === "/metrics")
-      {
-        res.end(promClient.register.metrics());
-        return;
-      }
       console.log("\n\n ===== New Incoming Request =====");
       let httpTimer = new Timer("http_response");
-      let operation:myTypes.ServerRequestBody = await getHTTPBody(req);
+      let operation:myTypes.ServerRequest = await getHTTPBody(req);
       let tracker = new RequestTracker("");
       try
       {
-        let answer = await handleRequest(operation, "", undefined, tracker);
+        let answer = await handleRequest(operation.body, operation.path, undefined, tracker);
         res.write(JSON.stringify(answer));
         res.end();
       }

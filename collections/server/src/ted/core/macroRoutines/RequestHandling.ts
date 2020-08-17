@@ -107,7 +107,6 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
 
 export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
 {
-    console.log(opDescriptor);
     let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], true);
     try
     {

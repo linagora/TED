@@ -214,7 +214,10 @@ export class CQLBatchOperation implements myTypes.DBDirectOperation
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
+    globalCounter.inc("cql_batch_isolated");
+    let timer = new Timer("cql_batch_isolated");
     let res = await datastaxTools.runBatchDB(this.queries);
+    timer.stop();
     return res;
   }
 
@@ -256,7 +259,10 @@ export class CQLOperationArray implements myTypes.DBDirectOperation
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
+    globalCounter.inc("cql_batch_unisolated");
+    let timer = new Timer("cql_batch_unisolated");
     let res = await datastaxTools.runMultiOpDB(this.queries);
+    timer.stop
     return res;
   }
 

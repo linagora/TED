@@ -156,11 +156,9 @@ export async function sendToAfterSave(opDescriptor:myTypes.InternalOperationDesc
     return new Promise(async (resolve, reject) => 
     {
         try{
-            console.log("ICIIIII", opDescriptor);
             if(opDescriptor.afterSave === undefined) resolve();
             else
             {
-                console.log("LAAAAAAAA");
                 let getOp = new GetMainView({
                     action: myTypes.action.get,
                     opID: opDescriptor.opID,
@@ -169,7 +167,6 @@ export async function sendToAfterSave(opDescriptor:myTypes.InternalOperationDesc
                 });
                 let res = await getOp.execute()
                 myCrypto.decryptResult(res, myCrypto.globalKey);
-                console.log(res.queryResults);
                 if(res.queryResults?.allResultsClear === undefined) throw new Error("Unable to find the created object");
                 let ans:myTypes.ServerSideObject = {};
                 ans["object"] = res.queryResults.allResultsClear[0].object as myTypes.ServerSideObject;

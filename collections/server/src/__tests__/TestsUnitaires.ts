@@ -1,7 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
+import https from "https";
 import post from 'axios';
 import { writeFile, readFile } from "fs";
 
+const agent = new https.Agent({  
+    rejectUnauthorized: false
+});
 
 function randint(min:number, max:number) { // min and max included 
     return Math.floor(Math.random() * (max - min + 1) + min);
@@ -51,11 +55,14 @@ export function randomObject():DBObject
 
 export async function saveObject(obj:DBObject):Promise<void>
 {
-    const response = await post("http://localhost:8080/", {
+    const response = await post("https://localhost:8080/", {
+        httpsAgent: agent,
         data: {
-            action: "save",
             path: obj.path,
-            object: obj.object
+            body: {
+                action: "save",
+                object: obj.object
+            }
         }
     });
     console.log(obj);
@@ -65,10 +72,13 @@ export async function saveObject(obj:DBObject):Promise<void>
 
 export async function getObject(path:string):Promise<Object>
 {
-    const response = await post("http://localhost:8080", {
+    const response = await post("https://localhost:8080", {
+        httpsAgent: agent,
         data: {
-            action: "get",
-            path: path
+            path: path,
+            body: {
+                action: "get",
+            }
         }
     })
     if(response.data.queryResults === undefined) 
@@ -91,14 +101,17 @@ export async function getObject(path:string):Promise<Object>
 
 export async function getObjectWhere(path:string, key:string, value:number):Promise<Object[]>
 {
-    const response = await post("http://localhost:8080", {
+    const response = await post("https://localhost:8080", {
+        httpsAgent: agent,
         data: {
-            action: "get",
             path: path,
-            where:{
-                operator:"=",
-                field:key,
-                value:value
+            body: {
+                action: "get",
+                where:{
+                    operator:"=",
+                    field:key,
+                    value:value
+                }
             }
         }
     })
@@ -131,10 +144,13 @@ export async function writeFusion():Promise<void>
 
 export async function removeObject(path:string):Promise<void>
 {
-    const response = await post("http://localhost:8080/", {
+    const response = await post("https://localhost:8080/", {
+        httpsAgent: agent,
         data: {
-            action: "remove",
-            path: path
+            path: path,
+            body: {
+                action: "remove"
+            }
         }
     });
     console.log(response.data);

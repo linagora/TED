@@ -81,8 +81,6 @@ const defaultQueryOptions:cassandra.QueryOptions = {
 
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
-  globalCounter.inc("single_cql_request");
-  let timer = new Timer("single_cql_request");
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n   " + JSON.stringify(query) );
   try
@@ -91,13 +89,11 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
     if(options === undefined) options = defaultQueryOptions;
     rs = await client.execute(query.query, query.params, options);
     console.log("   End query ", queryID);
-    timer.stop();
     return processResult(rs);
   }
   catch(err)
   {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
-    timer.stop();
     throw err;
   }
 };
