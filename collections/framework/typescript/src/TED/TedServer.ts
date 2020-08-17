@@ -4,7 +4,7 @@ import AfterOperation from "./AfterOperation";
 
 const PORT = 8080;
 const HOSTNAME = "localhost";
-const TED_URL = "http://localhost:8080";
+const TED_URL = "https://localhost:8080";
 
 export type Credentials = {
     username:string,
@@ -26,7 +26,7 @@ export default class TEDServer
 
     public async connect(credentials:Credentials):Promise<void>
     {
-        this.socket = socketIO(TED_URL);
+        this.socket = socketIO(TED_URL, {secure: true, rejectUnauthorized: false});
 
         this.socket.on("afterSave", async (data:any, ack:any) =>
         {
