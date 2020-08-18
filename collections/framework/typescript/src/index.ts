@@ -60,49 +60,65 @@ export default class TED {
     app.route("/api/collections/*")
     .put(async function (req, res, next)
     {
-      let path = req.path.replace("/api/collections/", "");
-      let collectionPath = TED.getCollectionPath(path);
-      let save:HTTPSaveBody = req.body;
-      let after:boolean = that.after.saves[collectionPath] !== undefined;
-      let tedRequest:SaveRequest = {
-        path: path,
-        body:{
-          action:"save",
-          object:save.object
-        },
-        afterSave: after
-      };
-      console.log(path);
-      tedRequest = await that.before.runSave(tedRequest, req);
-      let response = await that.db.save(tedRequest);
-      res.send(response);
+      try
+      {
+        let path = req.path.replace("/api/collections/", "");
+        let collectionPath = TED.getCollectionPath(path);
+        let save:HTTPSaveBody = req.body;
+        let after:boolean = that.after.saves[collectionPath] !== undefined;
+        let tedRequest:SaveRequest = {
+          path: path,
+          body:{
+            action:"save",
+            object:save.object
+          },
+          afterSave: after
+        };
+        console.log(path);
+        tedRequest = await that.before.runSave(tedRequest, req);
+        let response = await that.db.save(tedRequest);
+        res.send(response);
+      }
+      catch(err)
+      {
+        res.send("Internal error : " + err.message);
+      }
     })
     .get(async function (req, res, next)
     {
-      let path = req.path.replace("/api/collections/", "");
-      let collectionPath = TED.getCollectionPath(path);
-      let get:HTTPGetBody = req.body;
-      let after:boolean = that.after.gets[collectionPath] !== undefined;
-      let tedRequest:GetRequest = {
-        path:path,
-        body:{
-          action:"get",
-          order:get.order,
-          limit:get.limit,
-          pageToken:get.pageToken,
-          where:get.where,
-          advancedSearch:get.advancedSearch
-        },
-        afterGet: after
-      };
-      console.log(path);
-      tedRequest = await that.before.runGet(tedRequest, req);
-      let response = await that.db.get(tedRequest);
-      res.send(response);
+      try
+      {
+        let path = req.path.replace("/api/collections/", "");
+        let collectionPath = TED.getCollectionPath(path);
+        let get:HTTPGetBody = req.body;
+        let after:boolean = that.after.gets[collectionPath] !== undefined;
+        let tedRequest:GetRequest = {
+          path:path,
+          body:{
+            action:"get",
+            order:get.order,
+            limit:get.limit,
+            pageToken:get.pageToken,
+            where:get.where,
+            advancedSearch:get.advancedSearch
+          },
+          afterGet: after
+        };
+        console.log(path);
+        tedRequest = await that.before.runGet(tedRequest, req);
+        let response = await that.db.get(tedRequest);
+        res.send(response);
+      }
+      catch(err)
+      {
+        res.send("Internal error : " + err.message);
+      }
     })
     .delete(async function(req, res, next)
     {
-      let path = req.path.replace("/api/collections/", "");
+      try
+      {
+        let path = req.path.replace("/api/collections/", "");
       let collectionPath = TED.getCollectionPath(path);
       let after:boolean = that.after.removes[collectionPath] !== undefined;
       let tedRequest:RemoveRequest = {
@@ -116,6 +132,11 @@ export default class TED {
       tedRequest = await that.before.runRemove(tedRequest, req);
       let response = await that.db.remove(tedRequest);
       res.send(response);
+    }
+    catch(err)
+    {
+      res.send("Internal error : " + err.message);
+    }
     });
   }
 

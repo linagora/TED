@@ -6,7 +6,7 @@ let ted = new TED();
 // First connect to TED and set options
 ted.server.connect({
   username: "",
-  password: ""
+  password: "ceci est un mot de passe"
 });
 
 

@@ -1,4 +1,5 @@
 import socketIO from "socket.io-client";
+import crypto from "crypto";
 import { TedRequest, SaveRequest, GetRequest, RemoveRequest } from "./DB";
 import AfterOperation from "./AfterOperation";
 
@@ -16,17 +17,29 @@ let nullSocketError = new Error("TED socket has been deleted.");
 export default class TEDServer
 {
     socket:SocketIOClient.Socket | null;
+    salt:Buffer;
+    logged:boolean;
     after:AfterOperation;
 
     constructor(after:AfterOperation)
     {
       this.after = after;
       this.socket = null;
+      this.logged = false
+      this.salt = Buffer.alloc(16);
     }
 
     public async connect(credentials:Credentials):Promise<void>
     {
         this.socket = socketIO(TED_URL, {secure: true, rejectUnauthorized: false});
+        let that = this;
+
+        this.socket.on("authenticate", (salt:Buffer, login:any) => 
+        {
+            //let hmac = crypto.createHmac("sha512", salt);
+            let hash:Buffer = crypto.pbkdf2Sync(credentials.password, salt, 1000, 512, "sha512");
+            login(hash);
+        });
 
         this.socket.on("afterSave", async (data:any, ack:any) =>
         {
@@ -37,6 +50,7 @@ export default class TEDServer
             }
             catch(err){
                 console.error(err);
+                ack(err);
             }
         });
 
@@ -49,6 +63,7 @@ export default class TEDServer
             }
             catch(err){
                 console.error(err);
+                ack(err);
             }
         });
 
@@ -61,27 +76,50 @@ export default class TEDServer
             }
             catch(err){
                 console.error(err);
+                ack(err);
             }
         });
         
-        this.socket.on("disconnect", (reason:string) => 
+        this.socket.on("disconnect", async (reason:string) => 
         {
-            console.log("disconnected, trying to reconnect");
-            if(reason === "io server disconnected") 
+            that.logged = false;
+            console.log("disconnected");
+            await delay(1000);
+            if(reason === "io server disconnect") 
             {
                 if(this.socket === null) throw nullSocketError;
                 this.socket.connect();
             }
         });
 
-        this.socket.on("connect", () =>
-        {
-            if(this.socket === null) throw nullSocketError;
-            this.socket.emit("login", credentials, (result:any) =>
-            {
-                console.log(result);
-            });
+        this.socket.on("reconnecting", (attemptNumber:number) => { console.log("reconnecting..."); })
+
+        this.socket.on("connect", () => {"socket connected, waiting for login..."});
+
+        this.socket.on("loginSuccess", () => {
+            console.log("Login successful");
+            that.logged = true;
         });
+
+        this.socket.on("loginFail", ()=> {
+            console.log("Invalid credentials");
+            that.logged = false;
+        })
+
+        /* this.socket.on("connect", async () => 
+        {
+            that.socket?.emit("getSalt", (salt:Buffer) => 
+            {
+                that.salt = salt;
+                let hash:Buffer = crypto.pbkdf2Sync(credentials.password, salt, 1000, 512, "sha512");
+                console.log(salt);
+                that.socket?.emit("login", hash, (err:Error, msg:string) =>
+                {
+                    if(err) console.error(err);
+                    else console.log(msg);
+                })
+            })
+        }) */
     }
 
     public async request(request:TedRequest):Promise<any>
@@ -89,18 +127,33 @@ export default class TEDServer
       return new Promise((resolve, reject) =>
       {
         try{
-          console.log("sending :", request);
-          if(this.socket === null) throw nullSocketError;
-          this.socket.emit("tedRequest", request, (result:any) => 
-          {
-            console.log(result);
-            resolve(result);
-          });
+            console.log("sending :", request);
+            if(this.socket === null) throw nullSocketError;
+            if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
+            if(! this.logged) throw new Error("Not logged in");
+            this.socket.emit("tedRequest", request, (err:Error, result:any) => 
+            {
+                if(err !== null)
+                {
+                    console.error(err);
+                    reject(err);
+                }
+                else
+                {
+                    console.log(result);
+                    resolve(result);
+                }
+            });
         }
         catch(err){
-          console.error(err);
-          reject(err);
+            console.error(err);
+            reject(err);
         }
       });
     }
+}
+
+export async function delay(ms:number):Promise<void>
+{
+    return new Promise( resolve => setTimeout(resolve, ms) );
 }

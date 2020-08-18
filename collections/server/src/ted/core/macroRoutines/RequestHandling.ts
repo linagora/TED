@@ -10,6 +10,7 @@ import { v1 as uuidv1 } from "uuid";
 import { Timer, RequestTracker } from "../../services/monitoring/Timer";
 import { processPath, delay, truncatePath } from "../../services/utils/divers";
 import { SaveEventStore } from "../tedOperations/EventsTable";
+import * as config from "../../../config/config";
 
 export async function createOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.GenericOperation>
 {
@@ -107,7 +108,8 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
 
 export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
 {
-    let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], true);
+    let enableIsolation = config.cassandra.core !== "keyspace";
+    let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], enableIsolation);
     try
     {
         await opWrite.execute();
