@@ -38,7 +38,6 @@ export async function setup(httpsServer:https.Server):Promise<void>
         {
             if(! isAuth(socket))
             {
-                console.log("laaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
                 let notAuthError = new Error("User not authentified");
                 notAuthError.name = "notAuthError";
                 console.error(notAuthError);

@@ -38,6 +38,7 @@ export async function tedRequest(socket:socketIO.Socket, data:any, callback:any)
         callback(null, result);
     }
     catch(err){
-        callback(err, null);
+        console.error(err);
+        callback(err.message, null);
     }
 }

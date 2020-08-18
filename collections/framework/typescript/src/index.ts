@@ -2,8 +2,9 @@ import TEDServer, { Credentials } from "./TED/TedServer";
 import DB, { TedRequest, SaveRequest, GetRequest, RemoveRequest } from "./TED/DB";
 import BeforeOperation, { BeforeProcess } from "./TED/BeforeOperation";
 import AfterOperation, { AfterProcess } from "./TED/AfterOperation";
+import Schemas from "./TED/Schemas";
 import express from "express";
-import { cpuUsage } from "process";
+import { Schema } from "inspector";
 
 export type HTTPSaveBody = 
 {
@@ -43,6 +44,7 @@ export default class TED {
 
   before:BeforeOperation;
   after:AfterOperation;
+  schemas:Schemas;
   server:TEDServer;
   db:DB;
 
@@ -50,6 +52,7 @@ export default class TED {
   {
     this.before = new BeforeOperation();
     this.after = new AfterOperation();
+    this.schemas = new Schemas();
     this.server = new TEDServer(this.after);
     this.db = new DB(this.server);
   }
@@ -70,7 +73,8 @@ export default class TED {
           path: path,
           body:{
             action:"save",
-            object:save.object
+            object:save.object,
+            schema: that.schemas.schemas[collectionPath] !== undefined ? that.schemas.get(collectionPath, save.object) : undefined
           },
           afterSave: after
         };
@@ -125,6 +129,7 @@ export default class TED {
         path: path,
         body:{
           action:"remove",
+          schema: that.schemas.schemas[collectionPath] !== undefined ? that.schemas.get(collectionPath) : undefined
         },
         afterRemove: after
       };

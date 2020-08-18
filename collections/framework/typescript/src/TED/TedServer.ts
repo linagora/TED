@@ -131,12 +131,13 @@ export default class TEDServer
             if(this.socket === null) throw nullSocketError;
             if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
             if(! this.logged) throw new Error("Not logged in");
-            this.socket.emit("tedRequest", request, (err:Error, result:any) => 
+            this.socket.emit("tedRequest", request, (err:any, result:any) => 
             {
                 if(err !== null)
                 {
-                    console.error(err);
-                    reject(err);
+                    let error = new Error("TED Error : " + err);
+                    console.error(error);
+                    reject(error);
                 }
                 else
                 {

@@ -1,4 +1,5 @@
 import TEDServer from "./TedServer";
+import { TEDSchema } from "./Schemas";
 
 export type TedRequest = SaveRequest | GetRequest  | RemoveRequest;
 
@@ -27,6 +28,7 @@ export type SaveBody =
 {
     action:"save";
     object:Object;
+    schema?:TEDSchema;
 }
 
 export type GetBody = 
@@ -61,7 +63,8 @@ enum Operator
   
 export type RemoveBody =
 {
-    action:"remove"
+    action:"remove";
+    schema?:TEDSchema;
 }
 
 export default class DB

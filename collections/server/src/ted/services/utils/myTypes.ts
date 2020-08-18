@@ -51,8 +51,16 @@ export type ServerRequest = {
   body:ServerRequestBody;
 }
 
+export type TEDSchema =
+{
+    fullsearchIndex:string[];
+    wsPrivateKeys:string[];
+    dbSearchIndex:string[];
+}
+
 export type ServerRequestBody = {
   action: action;
+  schema?:TEDSchema;
   object?:ServerSideObject;
   options?:SaveOptions | GetOptions;
   order?:Order;
