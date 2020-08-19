@@ -6,4 +6,6 @@ src/config/ssl/
 /src/__tests__/DBState.json
 /src/config/config.ts
 /src/config/AmazonRootCA1.pem
+src/config/ssl/key.pem
+src/config/ssl/cert.pem
 src/ted/services/monitoring/logs/
