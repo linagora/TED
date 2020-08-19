@@ -74,6 +74,7 @@ export type InternalOperationDescription = {
   collections:string[];
   documents:string[];
   opID:string;
+  schema?:TEDSchema;
   clearObject?:ServerSideObject;
   encObject?:string;
   operations?:InternalOperationDescription[];

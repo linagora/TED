@@ -5,6 +5,7 @@ import { Timer, RequestTracker } from "../../services/monitoring/Timer";
 import { getPreviousValue, SaveMainView } from "../tedOperations/MainProjections";
 import { getSaveSecondaryView, TStoCQLtypes, removePreviousValue, createSecondaryInfos } from "../tedOperations/SecondaryProjections";
 import { tableCreationError, BaseOperation, BatchOperation } from "../../services/database/operations/baseOperations";
+import { schedulingPolicy } from "cluster";
 
 const noPreviousValue:Error = new Error("Unable to find a previous value");
 
@@ -27,14 +28,22 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
 
         console.log("previous value = ", JSON.stringify(previousVersion));
         opDescriptor.clearObject = {...previousVersion, ...opDescriptor.clearObject};
-        Object.entries(opDescriptor.clearObject).forEach( ([key, value]) =>
+        if(opDescriptor.schema !== undefined)
         {
-            if(TStoCQLtypes.get(typeof(value)) !== undefined && previousVersion[key] !== value && previousVersion[key] !== undefined )
+            for(let key of opDescriptor.schema.dbSearchIndex)
             {
-                opArray.push(removePreviousValue(opDescriptor, createSecondaryInfos(previousVersion, key)));
+                if(opDescriptor.clearObject[key] !== undefined)
+                {
+                    let value = (opDescriptor.clearObject as myTypes.ServerSideObject)[key];
+                    if(TStoCQLtypes.get(typeof(value)) !== undefined && previousVersion[key] !== value && previousVersion[key] !== undefined )
+                    {
+                        opArray.push(removePreviousValue(opDescriptor, createSecondaryInfos(previousVersion, key)));
+                    }
+                    opArray.push(getSaveSecondaryView(opDescriptor, key));
+                }
             }
-            opArray.push(getSaveSecondaryView(opDescriptor, key));
-        });
+        }
+        
     }
     catch(err)
     {   

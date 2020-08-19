@@ -18,13 +18,20 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
         tracker?.endStep("secondary_table_read");
         if(previousValueEnc === null) return new BatchOperation([], false);
         let previousValue:myTypes.ServerSideObject = myCrypto.decryptData(previousValueEnc, myCrypto.globalKey);
-        Object.entries(previousValue).forEach( ([key, value]) =>
+        if(opDescriptor.schema !== undefined)
         {
-            if(TStoCQLtypes.get(typeof(value)) !== undefined)
+            for(let key of opDescriptor.schema.dbSearchIndex)
             {
-                opArray.push(getRemoveSecondaryView(opDescriptor, createSecondaryInfos(previousValue, key)));
+                if(previousValue[key] !== undefined)
+                {
+                    let value = previousValue[key];
+                    if(TStoCQLtypes.get(typeof(value)) !== undefined)
+                    {
+                        opArray.push(getRemoveSecondaryView(opDescriptor, createSecondaryInfos(previousValue, key)));
+                    }
+                }
             }
-        })
+        }
     }
     else
     {
