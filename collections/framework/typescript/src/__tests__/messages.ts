@@ -36,18 +36,18 @@ ted.before.save(
 
 app.listen(9000);
 console.log("running");
-/* ted.pushAfterSave(
-  "companies/channels/messages",
-  async (objectBefore: any, objectAfter: any) => {
-    if (objectBefore === null) {
-      let channel = await ted.document("companies/channels", [
-        "company-3",
-        "channel-12"
-      ]);
-      channel.update({
-        total_messages: total_messages + 1
-      });
-      await channel.save();
-    }
+ted.schemas.add("company",{
+  fullsearchIndex:{
+    default:false
+  },
+  dbSearchIndex:{
+    default:false,
+    content:true,
+    auteur:true,
+    null:true,
+    piege:false
+  },
+  wsPrivateKeys:{
+    default:false
   }
-); */
+})

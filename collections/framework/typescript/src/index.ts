@@ -1,7 +1,7 @@
 import TEDServer, { Credentials } from "./TED/TedServer";
 import DB, { TedRequest, SaveRequest, GetRequest, RemoveRequest } from "./TED/DB";
 import BeforeOperation, { BeforeProcess } from "./TED/BeforeOperation";
-import AfterOperation, { AfterProcess } from "./TED/AfterOperation";
+import AfterOperation, { AfterProcess, AfterTask } from "./TED/AfterOperation";
 import Schemas from "./TED/Schemas";
 import express from "express";
 import { Schema } from "inspector";
@@ -143,6 +143,21 @@ export default class TED {
       res.send("Internal error : " + err.message);
     }
     });
+  }
+
+  public async afterTask():Promise<void>
+  {
+    let afterTask:AfterTask = await this.server.getTask();
+    try
+    {
+      await this.after.run(afterTask);
+      await this.server.ackTask(afterTask);
+    }
+    catch(err)
+    {
+      await this.server.nackTask(afterTask);
+    }
+    
   }
 
   public static getCollectionPath(path:string):string

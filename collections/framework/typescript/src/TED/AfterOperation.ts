@@ -1,11 +1,18 @@
 import TED from "..";
-import { SaveRequest, GetRequest, RemoveRequest } from "./DB";
 
-export type AfterProcess = (object:Object) => Object;
+export type AfterProcess = (object:Object) => Promise<void>;
 
 type AfterProcessMap = {
     [path:string]:AfterProcess;
-}  
+}
+
+export type AfterTask =
+{
+    action:"save" | "get" | "remove";
+    path:string;
+    object:Object;
+    deliveryTag:string;
+}
 
 export default class AfterOperation
 {
@@ -13,28 +20,30 @@ export default class AfterOperation
     gets:AfterProcessMap = {};
     removes:AfterProcessMap = {};
 
-    public async runSave(data:SaveRequest):Promise<any>
+    public async run(task:AfterTask):Promise<void>
     {
-        let collectionPath = TED.getCollectionPath(data.path);
-        if(this.saves[collectionPath] !== undefined)
-            return this.saves[collectionPath](data);
-        return data;
-    }
-
-    public async runGet(data:GetRequest):Promise<any>
-    {
-        let collectionPath = TED.getCollectionPath(data.path);
-        if(this.gets[collectionPath] !== undefined)
-            return this.gets[collectionPath](data);
-        return data;
-    }
-
-    public async runRemove(data:RemoveRequest):Promise<any>
-    {
-        let collectionPath = TED.getCollectionPath(data.path);
-        if(this.removes[collectionPath] !== undefined)
-            return this.saves[collectionPath](data);
-        return data;
+        let handler:AfterProcess;
+        let collectionPath = TED.getCollectionPath(task.path);
+        switch(task.action)
+        {
+            case "save":
+            {
+                handler = this.saves[collectionPath];
+                break;
+            }
+            case "get":
+            {
+                handler = this.gets[collectionPath];
+                break;
+            }
+            case "remove":
+            {
+                handler = this.removes[collectionPath];
+                break;
+            }
+        }
+        if(handler === undefined) return;
+        return handler(task.object);
     }
 
     public save(path:string, callback:AfterProcess)

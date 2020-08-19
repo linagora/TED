@@ -1,7 +1,9 @@
 import socketIO from "socket.io-client";
 import crypto from "crypto";
 import { TedRequest, SaveRequest, GetRequest, RemoveRequest } from "./DB";
-import AfterOperation from "./AfterOperation";
+import AfterOperation, { AfterTask } from "./AfterOperation";
+import { rejects } from "assert";
+import { resourceUsage } from "process";
 
 const PORT = 8080;
 const HOSTNAME = "localhost";
@@ -40,45 +42,6 @@ export default class TEDServer
             let hash:Buffer = crypto.pbkdf2Sync(credentials.password, salt, 1000, 512, "sha512");
             login(hash);
         });
-
-        this.socket.on("afterSave", async (data:any, ack:any) =>
-        {
-            console.log(data);
-            try{
-                await this.after.runSave(data as SaveRequest);
-                ack();
-            }
-            catch(err){
-                console.error(err);
-                ack(err);
-            }
-        });
-
-        this.socket.on("afterGet", async (data:any, ack:any) =>
-        {
-            console.log(data);
-            try{
-                await this.after.runGet(data as GetRequest);
-                ack();
-            }
-            catch(err){
-                console.error(err);
-                ack(err);
-            }
-        });
-
-        this.socket.on("afterRemove", async (data:any, ack:any) =>
-        {
-            console.log(data);
-            try{
-                await this.after.runRemove(data as RemoveRequest);
-                ack();
-            }
-            catch(err){
-                console.error(err);
-                ack(err);
-            }
-        });
         
         this.socket.on("disconnect", async (reason:string) => 
         {
@@ -105,21 +68,6 @@ export default class TEDServer
             console.log("Invalid credentials");
             that.logged = false;
         })
-
-        /* this.socket.on("connect", async () => 
-        {
-            that.socket?.emit("getSalt", (salt:Buffer) => 
-            {
-                that.salt = salt;
-                let hash:Buffer = crypto.pbkdf2Sync(credentials.password, salt, 1000, 512, "sha512");
-                console.log(salt);
-                that.socket?.emit("login", hash, (err:Error, msg:string) =>
-                {
-                    if(err) console.error(err);
-                    else console.log(msg);
-                })
-            })
-        }) */
     }
 
     public async request(request:TedRequest):Promise<any>
@@ -151,6 +99,103 @@ export default class TEDServer
             reject(err);
         }
       });
+    }
+
+    public async getTask():Promise<AfterTask>
+    {
+        return new Promise((resolve, reject) =>
+        {
+            try
+            {
+                console.log("getting task...");
+                if(this.socket === null) throw nullSocketError;
+                if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
+                if(! this.logged) throw new Error("Not logged in");
+                this.socket.emit("getTask", (err:string, res:AfterTask) => 
+                {
+                    if(err !== null)
+                    {
+                        let error = new Error("TED Error : " + err);
+                        console.error(error);
+                        reject(error);
+                    }
+                    else
+                    {
+                        console.log(res);
+                        resolve(res);
+                    }
+                });
+            }
+            catch(err)
+            {
+                console.error(err);
+                reject(err);
+            }
+        });
+    }
+
+    public async ackTask(task:AfterTask):Promise<void>
+    {
+        return new Promise((resolve, reject) =>
+        {
+            try
+            {
+                console.log("getting task...");
+                if(this.socket === null) throw nullSocketError;
+                if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
+                if(! this.logged) throw new Error("Not logged in");
+                this.socket.emit("ackTask", task.deliveryTag, (err:string) => 
+                {
+                    if(err !== null)
+                    {
+                        let error = new Error("TED Error : " + err);
+                        console.error(error);
+                        reject(error);
+                    }
+                    else
+                    {
+                        resolve();
+                    }
+                });
+            }
+            catch(err)
+            {
+                console.error(err);
+                reject(err);
+            }
+        });
+    }
+
+    public async nackTask(task:AfterTask):Promise<void>
+    {
+        return new Promise((resolve, reject) =>
+        {
+            try
+            {
+                console.log("getting task...");
+                if(this.socket === null) throw nullSocketError;
+                if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
+                if(! this.logged) throw new Error("Not logged in");
+                this.socket.emit("nackTask", task.deliveryTag, (err:string) => 
+                {
+                    if(err !== null)
+                    {
+                        let error = new Error("TED Error : " + err);
+                        console.error(error);
+                        reject(error);
+                    }
+                    else
+                    {
+                        resolve();
+                    }
+                });
+            }
+            catch(err)
+            {
+                console.error(err);
+                reject(err);
+            }
+        });
     }
 }
 
