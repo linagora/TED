@@ -76,7 +76,7 @@ export default class TED {
             object:save.object,
             schema: that.schemas.schemas[collectionPath] !== undefined ? that.schemas.get(collectionPath, save.object) : undefined
           },
-          afterSave: after
+          afterTask: after
         };
         console.log(path);
         tedRequest = await that.before.runSave(tedRequest, req);
@@ -106,11 +106,18 @@ export default class TED {
             where:get.where,
             advancedSearch:get.advancedSearch
           },
-          afterGet: after
         };
         console.log(path);
         tedRequest = await that.before.runGet(tedRequest, req);
         let response = await that.db.get(tedRequest);
+        if(after)
+        {
+          that.after.run({
+            action:"get",
+            path: path,
+            object: response.queryResults
+          })
+        }
         res.send(response);
       }
       catch(err)
@@ -131,7 +138,7 @@ export default class TED {
           action:"remove",
           schema: that.schemas.schemas[collectionPath] !== undefined ? that.schemas.get(collectionPath) : undefined
         },
-        afterRemove: after
+        afterTask: after
       };
 
       tedRequest = await that.before.runRemove(tedRequest, req);
@@ -145,19 +152,9 @@ export default class TED {
     });
   }
 
-  public async afterTask():Promise<void>
+  public async afterTasks(prefetch:number):Promise<void>
   {
-    let afterTask:AfterTask = await this.server.getTask();
-    try
-    {
-      await this.after.run(afterTask);
-      await this.server.ackTask(afterTask);
-    }
-    catch(err)
-    {
-      await this.server.nackTask(afterTask);
-    }
-    
+    this.server.runTasks(prefetch);
   }
 
   public static getCollectionPath(path:string):string

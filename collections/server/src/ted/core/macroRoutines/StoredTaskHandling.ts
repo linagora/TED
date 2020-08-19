@@ -13,6 +13,7 @@ import { sendToSocket } from "../../services/socket/sockectServer";
 import { Organizations } from "aws-sdk";
 
 export let mbInterface:messageBroker.TaskBroker|null;
+export let afterTaskSender:messageBroker.TaskBroker|null;
 
 export function setup():void
 {
@@ -21,19 +22,26 @@ export function setup():void
         case "RabbitMQ":
         {
             console.log("Intializing RabbitMQ interface");
-            mbInterface = new messageBroker.RabbitMQBroker(config.rabbitmq.URL, config.rabbitmq.queueName, projectTask, config.rabbitmq.queueOptions, config.rabbitmq.messageOptions);
+
+            mbInterface = new messageBroker.RabbitMQBroker(config.rabbitmq.taskBroker.URL, config.rabbitmq.taskBroker.queueName, projectTask, config.rabbitmq.taskBroker.queueOptions, config.rabbitmq.taskBroker.messageOptions, config.rabbitmq.taskBroker.rejectionTimeout, config.rabbitmq.taskBroker.prefetchCount);
+
+            afterTaskSender = new messageBroker.RabbitMQBroker(config.rabbitmq.afterTaskBroker.URL, config.rabbitmq.afterTaskBroker.queueName, dummyCallback, config.rabbitmq.afterTaskBroker.queueOptions, config.rabbitmq.afterTaskBroker.messageOptions, config.rabbitmq.afterTaskBroker.rejectionTimeout, config.rabbitmq.afterTaskBroker.prefetchCount);
             break;
         }
         case "SQS":
         {
             console.log("Intializing SQS interface");
-            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.queueOptions, config.sqs.messageOptions);
+
+            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.taskBroker.queueOptions, config.sqs.taskBroker.messageOptions, config.sqs.taskBroker.prefetchCount);
+
+            afterTaskSender = new messageBroker.SQSBroker(dummyCallback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, config.sqs.afetrTaskBroker.prefetchCount);
             break;
         }
         default:
         {
             console.log("No valid broker detected in config file");
             mbInterface = null;
+            afterTaskSender = null;
             break;
         }
     }
@@ -48,6 +56,8 @@ export async function projectTask(path:string):Promise<void>
         await runPendingOperation(op, false);
     }
 }
+
+async function dummyCallback(path:string):Promise<void>{}
 
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
 {
@@ -77,7 +87,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
         let tracker = new RequestTracker("projection");
         await runWriteOperation(opDescriptor, tracker);
-        sendToAfterSave(opDescriptor);
+        sendToAfterTask(opDescriptor);
         tracker.updateLabel("stored_write_operation");
         tracker.endStep("cassandra_write");
         let rmDescriptor = {...opDescriptor};
@@ -151,12 +161,12 @@ export async function fastForwardTaskStore():Promise<void>
     }
 }
 
-export async function sendToAfterSave(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+export async function sendToAfterTask(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
     return new Promise(async (resolve, reject) => 
     {
         try{
-            if(opDescriptor.afterSave === undefined) resolve();
+            if(opDescriptor.afterTask ==! true) resolve();
             else
             {
                 let getOp = new GetMainView({
@@ -167,13 +177,27 @@ export async function sendToAfterSave(opDescriptor:myTypes.InternalOperationDesc
                 });
                 let res = await getOp.execute()
                 myCrypto.decryptResult(res, myCrypto.globalKey);
-                if(res.queryResults?.allResultsClear === undefined) throw new Error("Unable to find the created object");
-                let ans:myTypes.ServerSideObject = {};
-                ans["object"] = res.queryResults.allResultsClear[0].object as myTypes.ServerSideObject;
-                ans["path"] = buildPath(opDescriptor.collections, opDescriptor.documents, false);
-                ans["originalRequest"] = opDescriptor.afterSave.originalRequest;
-                await sendToSocket("afterSave", ans, opDescriptor.afterSave);
-                resolve();
+                if(res.queryResults !== undefined && res.queryResults?.resultCount > 0)
+                {
+                    if(res.queryResults?.allResultsClear === undefined) throw new Error("Unable to find the created object");
+                    let ans:myTypes.AfterTask = {
+                        action:opDescriptor.action,
+                        path:buildPath(opDescriptor.collections, opDescriptor.documents, false),
+                        object:res.queryResults.allResultsClear[0].object as myTypes.ServerSideObject,
+                    };
+                    await afterTaskSender?.pushTask(JSON.stringify(ans), opDescriptor.opID);
+                    resolve();
+                }
+                else
+                {
+                    let ans:myTypes.AfterTask = {
+                        action:opDescriptor.action,
+                        path:buildPath(opDescriptor.collections, opDescriptor.documents, false),
+                        object:{},
+                    };
+                    await afterTaskSender?.pushTask(JSON.stringify(ans), opDescriptor.opID);
+                    resolve();
+                }
             }
         }
         catch(err){

@@ -101,101 +101,30 @@ export default class TEDServer
       });
     }
 
-    public async getTask():Promise<AfterTask>
+    public runTasks(prefetch:number):void
     {
-        return new Promise((resolve, reject) =>
-        {
-            try
-            {
-                console.log("getting task...");
-                if(this.socket === null) throw nullSocketError;
-                if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
-                if(! this.logged) throw new Error("Not logged in");
-                this.socket.emit("getTask", (err:string, res:AfterTask) => 
-                {
-                    if(err !== null)
-                    {
-                        let error = new Error("TED Error : " + err);
-                        console.error(error);
-                        reject(error);
-                    }
-                    else
-                    {
-                        console.log(res);
-                        resolve(res);
-                    }
-                });
-            }
-            catch(err)
-            {
-                console.error(err);
-                reject(err);
-            }
-        });
-    }
 
-    public async ackTask(task:AfterTask):Promise<void>
-    {
-        return new Promise((resolve, reject) =>
+        console.log("getting tasks...");
+        this.socket?.on("runTask", async (task:AfterTask, callback:any) =>
         {
             try
             {
-                console.log("getting task...");
-                if(this.socket === null) throw nullSocketError;
-                if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
-                if(! this.logged) throw new Error("Not logged in");
-                this.socket.emit("ackTask", task.deliveryTag, (err:string) => 
-                {
-                    if(err !== null)
-                    {
-                        let error = new Error("TED Error : " + err);
-                        console.error(error);
-                        reject(error);
-                    }
-                    else
-                    {
-                        resolve();
-                    }
-                });
+                await this.after.run(task);
+                callback(null);
             }
             catch(err)
             {
                 console.error(err);
-                reject(err);
+                callback(err.message);
             }
         });
-    }
 
-    public async nackTask(task:AfterTask):Promise<void>
-    {
-        return new Promise((resolve, reject) =>
+        this.socket?.emit("sendTasks", prefetch);
+
+        this.socket?.on("reconnect", () => 
         {
-            try
-            {
-                console.log("getting task...");
-                if(this.socket === null) throw nullSocketError;
-                if(! this.socket.connected) throw new Error("TED currently disconnected, please try again after reconnection");
-                if(! this.logged) throw new Error("Not logged in");
-                this.socket.emit("nackTask", task.deliveryTag, (err:string) => 
-                {
-                    if(err !== null)
-                    {
-                        let error = new Error("TED Error : " + err);
-                        console.error(error);
-                        reject(error);
-                    }
-                    else
-                    {
-                        resolve();
-                    }
-                });
-            }
-            catch(err)
-            {
-                console.error(err);
-                reject(err);
-            }
-        });
+            this.socket?.emit("sendTasks", prefetch);
+        })
     }
 }
 

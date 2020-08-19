@@ -7,21 +7,20 @@ export type SaveRequest =
 {
     path:string;
     body:SaveBody;
-    afterSave:boolean;
+    afterTask:boolean;
 }
 
 export type GetRequest = 
 {
     path:string;
     body:GetBody;
-    afterGet:boolean;
 }
 
 export type RemoveRequest = 
 {
     path:string;
     body:RemoveBody;
-    afterRemove:boolean;
+    afterTask:boolean;
 }
 
 export type SaveBody = 

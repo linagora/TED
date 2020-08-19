@@ -1,5 +1,6 @@
 import express from "express";
 import TED, { HttpError } from "../index";
+import { delay } from "../TED/TedServer";
 
 let ted = new TED();
 
@@ -35,7 +36,9 @@ ted.before.save(
 );
 
 app.listen(9000);
+
 console.log("running");
+
 ted.schemas.add("company",{
   fullsearchIndex:{
     default:false
@@ -50,4 +53,10 @@ ted.schemas.add("company",{
   wsPrivateKeys:{
     default:false
   }
-})
+});
+
+ted.after.save("company", async (object:Object) => { console.log("Aftersave : ", object);await delay(10000); console.log("end"); });
+ted.after.remove("company", async (object:Object) => { console.log("Afterremove : ", object);await delay(10000); console.log("end"); });
+ted.after.get("company", async (object:Object) => { console.log("Afterget : ", object);await delay(10000); console.log("end"); });
+
+ted.afterTasks(3);

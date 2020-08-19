@@ -82,7 +82,7 @@ export type InternalOperationDescription = {
   tableOptions?:TableOptions;
   secondaryInfos?:SecondaryInfos;
   keyOverride?:DBentry;
-  afterSave?:AfterSaveInfos;
+  afterTask?:boolean;
 };
 
 export type ServerAnswer = {
@@ -188,4 +188,11 @@ export type CQLOperationInfos = {
 export type AfterSaveInfos = {
   senderID:string,
   originalRequest:string,
+}
+
+export type AfterTask =
+{
+    action:action;
+    path:string;
+    object:Object;
 }

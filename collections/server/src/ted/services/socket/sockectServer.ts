@@ -1,7 +1,7 @@
 import socketIO from "socket.io";
 import https from "https";
 import crypto from "crypto";
-import { login, tedRequest } from "./procedures";
+import { login, tedRequest, sendTasks } from "./procedures";
 import { delay } from "../utils/divers";
 import * as myTypes from "../utils/myTypes";
 
@@ -29,10 +29,6 @@ export async function setup(httpsServer:https.Server):Promise<void>
         saltTable[socket.id] = salt;
 
         socket.emit("authenticate", salt, (hash:Buffer) => {login(socket, hash)})
-
-        //socket.on("getSalt", (callback:any) => {callback(salt)});
-
-        //socket.on("login", (hash:Buffer, callback:any) => {login(socket, hash, callback)})
         
         socket.on("tedRequest", async (data, callback) => 
         {
@@ -45,6 +41,11 @@ export async function setup(httpsServer:https.Server):Promise<void>
                 return;
             }
             await tedRequest(socket, data, callback);
+        });
+
+        socket.on("sendTasks", (prefetchCount:number) =>
+        {
+            sendTasks(socket, prefetchCount);
         });
 
         socket.on("disconnect", (reason) =>

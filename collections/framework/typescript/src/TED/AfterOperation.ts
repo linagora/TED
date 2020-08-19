@@ -11,7 +11,6 @@ export type AfterTask =
     action:"save" | "get" | "remove";
     path:string;
     object:Object;
-    deliveryTag:string;
 }
 
 export default class AfterOperation
