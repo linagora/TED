@@ -2,12 +2,13 @@ import * as amqp from "amqplib";
 import { SQS } from "aws-sdk";
 import { sqs, rabbitmq } from "../../../config/config";
 import { delay } from "../utils/divers";
-import { captureRejectionSymbol } from "events";
 
 type ExternalResolver = {
     res:() => void,
     rej:() => void
 }
+
+const interruptionError = new Error("Task interrupted before end");
 
 export abstract class TaskBroker
 {
@@ -15,15 +16,24 @@ export abstract class TaskBroker
     messageOptions?:Object;
     callback:(data:any)=>Promise<void>;
 
+    running:boolean;
+    interruptor?:ExternalResolver;
+
     constructor(callback:(path:string)=>Promise<void>, queueOptions?:Object, messageOptions?:Object)
     {
         this.queueOptions = queueOptions;
         this.messageOptions = messageOptions;
         this.callback = callback;
+        this.running = false;
     }
 
     public abstract async pushTask(task:string, ID:string):Promise<void>;
     public abstract async runTasks():Promise<void>;
+    public stops():void
+    {
+        this.running = false;
+        this.interruptor?.res();
+    }
 }
 
 export class RabbitMQBroker extends TaskBroker
@@ -63,20 +73,36 @@ export class RabbitMQBroker extends TaskBroker
     {
         try
         {
+            this.running = true;
+            let interruptor:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
+            let ineterruptPromise = new Promise((resolve, reject) =>
+            {
+                interruptor.res = resolve;
+                interruptor.rej = reject;
+            });
+            this.interruptor = interruptor;
+
+
             if(this.channel === undefined)
             {
-                await this.createChannel();
+                await Promise.race([this.createChannel(), ineterruptPromise]);
+                if(!this.running)
+                    throw interruptionError;
             }
             if(this.channel === undefined) throw new Error("Missing channel");
-            await this.channel.assertQueue(this.queueName, this.queueOptions);
-            await this.channel.prefetch(this.prefetechCount);
+            await Promise.race([this.channel.assertQueue(this.queueName, this.queueOptions), ineterruptPromise]);
+            await Promise.race([this.channel.prefetch(this.prefetechCount), ineterruptPromise]);
+            if(!this.running)
+                throw interruptionError;
             console.log("Connection to RabbitMQ successful, waiting for tasks")
             this.channel.consume(this.queueName, async (msg) => 
             {
                 if(msg === null) throw new Error("Received null from amqp");
                 try{
                     console.log("New task : ",msg.content.toString("utf-8"));
-                    await this.callback(msg.content.toString("utf-8"));
+                    await Promise.race([this.callback(msg.content.toString("utf-8")), ineterruptPromise]);
+                    if(!this.running)
+                        throw interruptionError;
                     console.log("End of task : ", msg.content.toString("utf-8"));
                     this.channel?.ack(msg);
                 }
@@ -124,11 +150,12 @@ export class SQSBroker extends TaskBroker
     queueURL?:string;
     prefetechCount:number;
     sqs:SQS;
+    fifo:boolean;
 
     currentOperations = 0;
     lock:ExternalResolver | null = null;
 
-    constructor(callback:(path:string)=>Promise<void>, queueOptions:SQS.CreateQueueRequest, messageOptions:Object, prefetechCount:number)
+    constructor(callback:(path:string)=>Promise<void>, queueOptions:SQS.CreateQueueRequest, messageOptions:Object, prefetechCount:number, fifo:boolean)
     {
         super(callback, queueOptions, messageOptions);
         this.sqs = new SQS({
@@ -137,9 +164,10 @@ export class SQSBroker extends TaskBroker
             secretAccessKey: sqs.accessKey
         });
         this.prefetechCount = prefetechCount;
+        this.fifo = fifo;
     }
 
-    public async pushTask(task:string, ID:string):Promise<void>
+    public async pushTask(task:string, ID?:string):Promise<void>
     {
         return new Promise(async (resolve, reject) =>
         {
@@ -149,8 +177,8 @@ export class SQSBroker extends TaskBroker
                 this.sqs.sendMessage({
                     QueueUrl: this.queueURL as string,
                     MessageBody: task,
-                    MessageGroupId: "projection",
-                    MessageDeduplicationId: ID
+                    MessageGroupId: this.fifo ? "projection" : undefined,
+                    MessageDeduplicationId: this.fifo ? ID : undefined
                 }, function(err, data):void {
                     if(err) 
                     {
@@ -169,11 +197,12 @@ export class SQSBroker extends TaskBroker
         });    
     }
 
-    private async runTask():Promise<void>
+    private async runTask(ineterruptPromise:Promise<unknown>):Promise<void>
     {
         return new Promise(async (resolve, reject) =>
         {
             try{
+                this.currentOperations += 1;
                 if(this.queueURL === undefined) await this.createQueue();
                 const that = this;
                 this.sqs.receiveMessage({QueueUrl: this.queueURL as string}, async function(err, data)
@@ -183,17 +212,17 @@ export class SQSBroker extends TaskBroker
                         if(err) reject(err);
                         if(data.Messages === undefined) 
                         {
-                            console.log("no message received");
                             await delay(1000);
+                            that.currentOperations -= 1;
                             resolve(); 
                             return;
                         }
                         let msg:SQS.Message = data.Messages[0];
-                        console.log("New task : ", msg.Body);
-                        that.currentOperations += 1;
+                        console.log("New task : ", msg.Body, that.currentOperations);
                         if(msg.Body === undefined) throw new Error("Received empty message");
-                        await that.callback(msg.Body);
-                        that.currentOperations -= 1;
+                        await Promise.race([that.callback(msg.Body), ineterruptPromise]);
+                        if(!that.running)
+                            throw interruptionError;
                         if(that.lock !== null)
                             that.lock.res();
                         that.sqs.deleteMessage({
@@ -203,17 +232,20 @@ export class SQSBroker extends TaskBroker
                         {
                             if(err) throw err;
                             console.log("End of task : ", msg.Body);
+                            that.currentOperations -= 1;
                             resolve();
                         });
                         return;
                     }
                     catch(err)
                     {
+                        that.currentOperations -= 1;
                         reject(err);
                     }
                 })
             }
             catch(err){
+                this.currentOperations -= 1;
                 reject(err);
                 return;
             }
@@ -222,26 +254,49 @@ export class SQSBroker extends TaskBroker
 
     public async runTasks():Promise<void>
     {
-        while(1){
-            while(this.currentOperations < this.prefetechCount)
+        try
+        {
+            this.running = true;
+            let interruptor:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
+            let ineterruptPromise = new Promise((resolve, reject) =>
             {
-                try{
-                    await this.runTask();
-                }
-                catch(err){
-                    console.log("End of task with error");
-                    console.error(err);
-                    await delay(1000);
-                }
-            }
-            let lock:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
-            let delayerPromise = new Promise(function (resolve, reject):void {
-                lock.res = resolve;
-                lock.rej = reject;
+                interruptor.res = resolve;
+                interruptor.rej = reject;
             });
-            this.lock = lock;
-            await delayerPromise;
-            this.lock = null;
+            this.interruptor = interruptor;
+
+            while(1){
+                while(this.currentOperations < this.prefetechCount)
+                {
+                    if(!this.running)
+                        throw interruptionError;
+                    try{
+                        await this.runTask(ineterruptPromise);
+                    }
+                    catch(err){
+                        if(err === interruptionError)
+                            throw err;
+                        console.log("End of task with error");
+                        console.error(err);
+                        await delay(1000);
+                    }
+                }
+                console.log("ICCIIIIII", this.currentOperations)
+                let lock:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
+                let delayerPromise = new Promise(function (resolve, reject):void {
+                    lock.res = resolve;
+                    lock.rej = reject;
+                });
+                this.lock = lock;
+                if(this.currentOperations >= this.prefetechCount) await delayerPromise;
+                this.lock = null;
+            }
+        }
+        catch(err)
+        {
+            console.log("interruption error");
+            console.error(err);
+            return;
         }
     }
 
