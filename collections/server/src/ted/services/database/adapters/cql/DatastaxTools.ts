@@ -3,8 +3,6 @@ import { readFileSync } from "fs";
 import * as myTypes from "../../../utils/myTypes";
 import { v4 as uuidv4 } from "uuid";
 import * as config from "../../../../../config/config";
-import { globalCounter } from "../../../../index";
-import { Timer, RequestTracker } from "../../../monitoring/Timer";
 
 let cassandraOptions:cassandra.DseClientOptions;
 let defaultQueryOptions:cassandra.QueryOptions;
@@ -99,7 +97,7 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
   }
 };
 
-export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()
@@ -123,7 +121,7 @@ export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.Que
   }
 }
 
-export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()

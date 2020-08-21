@@ -6,7 +6,7 @@ import * as myTypes from "./services/utils/myTypes";
 import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./core/macroRoutines/StoredTaskHandling";
 import { setup as cryptoSetup } from "./services/utils/cryptographicTools";
 import { setup as cassandraSetup, client as cassandraClient} from "./services/database/adapters/cql/DatastaxTools";
-import { TimerLogsMap, Timer, RequestTracker, RequestTrackerLog } from "./services/monitoring/Timer";
+import { TimerLogsMap, Timer } from "./services/monitoring/Timer";
 import { CounterMap } from "./services/monitoring/Counter";
 import { setup as promSetup } from "./services/monitoring/PrometheusClient";
 import * as config from "../config/config";
@@ -16,7 +16,6 @@ import { setup as setupSocketcluster } from "./services/socket/sockectServer";
 
 export let globalTimerLogs:TimerLogsMap;
 export let globalCounter:CounterMap;
-export let globalTrackerLogs:RequestTrackerLog;
 
 async function setup():Promise<void>
 {
@@ -25,8 +24,6 @@ async function setup():Promise<void>
     let Sentry = require("@sentry/node");
     Sentry.init({dsn: config.sentry.DSN});
   }
-  globalTrackerLogs = new RequestTrackerLog();
-  RequestTracker.logMap = globalTrackerLogs;
   globalTimerLogs = new TimerLogsMap();
   Timer.logMap = globalTimerLogs;
   globalCounter = new CounterMap();
@@ -100,10 +97,9 @@ async function main():Promise<void>
       console.log("\n\n ===== New Incoming Request =====");
       let httpTimer = new Timer("http_response");
       let operation:myTypes.ServerRequest = await getHTTPBody(req);
-      let tracker = new RequestTracker("");
       try
       {
-        let answer = await handleRequest(operation.body, operation.path, undefined, tracker);
+        let answer = await handleRequest(operation.body, operation.path, undefined);
         res.write(JSON.stringify(answer));
         res.end();
       }

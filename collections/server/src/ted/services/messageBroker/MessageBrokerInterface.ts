@@ -281,7 +281,6 @@ export class SQSBroker extends TaskBroker
                         await delay(1000);
                     }
                 }
-                console.log("ICCIIIIII", this.currentOperations)
                 let lock:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
                 let delayerPromise = new Promise(function (resolve, reject):void {
                     lock.res = resolve;

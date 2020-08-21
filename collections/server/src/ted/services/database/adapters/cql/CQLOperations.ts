@@ -1,7 +1,7 @@
 import * as myTypes from "../../../utils/myTypes";
 import * as datastaxTools from "./DatastaxTools";
 import { globalCounter } from "../../../../index";
-import { Timer, RequestTracker } from "../../../monitoring/Timer";
+import { Timer } from "../../../monitoring/Timer";
 
 export type CQLOperation = CQLBaseOperation | CQLBatchOperation | CQLOperationArray;
 

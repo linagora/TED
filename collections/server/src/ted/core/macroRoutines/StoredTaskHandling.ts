@@ -4,7 +4,7 @@ import * as messageBroker from "../../services/messageBroker/MessageBrokerInterf
 import { GetTaskStore, RemoveTaskStore } from "../tedOperations/TaskStore";
 import { runWriteOperation } from "./RequestHandling";
 import { globalCounter } from "../../index";
-import { Timer, RequestTracker } from "../../services/monitoring/Timer";
+import { Timer } from "../../services/monitoring/Timer";
 import { tableCreationError } from "../../services/database/operations/baseOperations";
 import { delay, buildPath, processPath } from "../../services/utils/divers";
 import * as myCrypto from "../../services/utils/cryptographicTools";
@@ -61,6 +61,7 @@ async function dummyCallback(path:string):Promise<void>{}
 
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
 {
+    let timer = new Timer("taskstore_read");
     let processedPath = processPath(path);
     let getOperation = new GetTaskStore({
         action: myTypes.action.get,
@@ -77,31 +78,32 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
     })
     let result = await getOperation.execute();
     if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query pending operations on given path : " + path);
+    timer.stop();
     return result.queryResults.allResultsEnc;
 }
 
 async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise<void>
 {
+    let timer = new Timer("projection");
     try
     {
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
-        let tracker = new RequestTracker("projection");
-        await runWriteOperation(opDescriptor, tracker);
+        await runWriteOperation(opDescriptor);
         sendToAfterTask(opDescriptor);
-        tracker.updateLabel("stored_write_operation");
-        tracker.endStep("cassandra_write");
         let rmDescriptor = {...opDescriptor};
         rmDescriptor.keyOverride = {
             path: opLog.path,
             op_id: opLog.op_id
         }
         let removeOperation = new RemoveTaskStore(rmDescriptor);
+        let rmTimer = new Timer("taskstore_remove");
         await removeOperation.execute();
-        tracker.endStep("taskstore_remove");
-        tracker.log();
+        rmTimer.stop();
+        timer.stop();
     }
     catch(err)
     {
+        timer.stop();
         if(err === tableCreationError && retry)
         {
             await delay(10000);
@@ -114,6 +116,7 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
 
 export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
+    let timer = new Timer("collection_forwarding");
     let path:string = buildPath(opDescriptor.collections, opDescriptor.documents, true);
     console.log("collection to forward", path);
     let operationsToForward:myTypes.DBentry[]
@@ -124,11 +127,13 @@ export async function forwardCollection(opDescriptor:myTypes.InternalOperationDe
         {
             await runPendingOperation(op, true);
         }
-    }while(operationsToForward.length == config.ted.taskStoreBatchSize )    
+    }while(operationsToForward.length == config.ted.taskStoreBatchSize )
+    timer.stop();
 }
 
 async function getAllOperations():Promise<myTypes.DBentry[]>
 {
+    let timer = new Timer("taskstore_write");
     let getOperation = new GetTaskStore({
         action: myTypes.action.get,
         opID: "null",
@@ -142,6 +147,7 @@ async function getAllOperations():Promise<myTypes.DBentry[]>
     })
     let result = await getOperation.execute();
     if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query all pending operations");
+    timer.stop();
     return result.queryResults.allResultsEnc;
 }
 

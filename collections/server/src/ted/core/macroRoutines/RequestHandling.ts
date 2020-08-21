@@ -7,7 +7,7 @@ import { SaveTaskStore } from "../tedOperations/TaskStore";
 import { BatchOperation, tableCreationError } from "../../services/database/operations/baseOperations";
 import { mbInterface } from "./StoredTaskHandling";
 import { v1 as uuidv1 } from "uuid";
-import { Timer, RequestTracker } from "../../services/monitoring/Timer";
+import { Timer } from "../../services/monitoring/Timer";
 import { processPath, delay, truncatePath } from "../../services/utils/divers";
 import { SaveEventStore } from "../tedOperations/EventsTable";
 import * as config from "../../../config/config";
@@ -68,11 +68,10 @@ export function getInternalOperationDescription(request:myTypes.ServerRequestBod
     return opDescriptor;
 }
 
-export default async function handleRequest(request:myTypes.ServerRequestBody, path:string, afterTask?:boolean, tracker?:RequestTracker ):Promise<myTypes.ServerAnswer>
+export default async function handleRequest(request:myTypes.ServerRequestBody, path:string, afterTask?:boolean):Promise<myTypes.ServerAnswer>
 {
     let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request, path, afterTask);
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
-    tracker?.endStep("encryption");
     try
     {
         switch(opDescriptor.action)
@@ -81,24 +80,18 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
             case myTypes.action.remove:
             {
                 let totalResponseTime = new Timer("write_request");
-                tracker?.updateLabel("taskstore_write")
-                await logEvent(opDescriptor, tracker);
-                tracker?.endStep("taskstore_write");
+                await logEvent(opDescriptor);
+                let timer = new Timer("mb_write");
                 if(mbInterface !== null) await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
-                tracker?.endStep("broker_write");
-                tracker?.log();
+                timer.stop();
                 totalResponseTime.stop();
                 return {status: "Success"};
             }
             case myTypes.action.get:
             {
                 let totalResponseTime = new Timer("read_request");
-                tracker?.updateLabel("read_operation");
-                let res = await runReadOperation(opDescriptor, tracker);
-                tracker?.endStep("cassandra_read")
+                let res = await runReadOperation(opDescriptor);
                 myCrypto.decryptResult(res, myCrypto.globalKey);
-                tracker?.endStep("decryption");
-                tracker?.log();
                 totalResponseTime.stop();
                 return res;
             }
@@ -114,61 +107,71 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
     }
 }
 
-export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
+export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, timer?:Timer):Promise<void>
 {
+    if(timer === undefined) timer = new Timer("taskstore_write");
     let enableIsolation = config.cassandra.core !== "keyspace";
     let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], enableIsolation);
     try
     {
         await opWrite.execute();
+        timer.stop();
     }
     catch(err)
     {
         if(err === tableCreationError)
         {
             await delay(1000);
-            return logEvent(opDescriptor, tracker);
+            return logEvent(opDescriptor, timer);
         }
-        else throw err;
+        else
+        {
+            timer.stop();
+            throw err;
+        }
     }
 
 }
 
-export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>
+export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    switch(opDescriptor.action)
+    let timer = new Timer("projection_write");
+    try
     {
-        case myTypes.action.save:
+        switch(opDescriptor.action)
         {
-            tracker?.updateLabel("save_operation");
-            let op = await saveRoutine(opDescriptor, tracker);
-            tracker?.endStep("operation_computation")
-            await op.execute();
-            tracker?.endStep("cassandra_write");
-            break;
+            case myTypes.action.save:
+            {
+                let op = await saveRoutine(opDescriptor);
+                await op.execute();
+                timer.stop();
+                break;
+            }
+            case myTypes.action.remove:
+            {
+                let op = await removeRoutine(opDescriptor);
+                await op.execute();
+                timer.stop()
+                break;
+            }
+            default:
+            {
+                timer.stop();
+                throw new Error("This is not an authorized wirte operation");
+            }
         }
-        case myTypes.action.remove:
-        {
-            tracker?.updateLabel("remove_operation");
-            let op = await removeRoutine(opDescriptor, tracker);
-            tracker?.endStep("operation_computation")
-            await op.execute();
-            tracker?.endStep("cassandra_write");
-            break;
-        }
-        default:
-        {
-            throw new Error("This is not an authorized wirte operation");
-        }
+    }
+    catch(err)
+    {
+        timer.stop();
+        throw err;
     }
 }
 
-async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.ServerAnswer>
 {
     if(opDescriptor.action !== myTypes.action.get) throw new Error("This is not an authorized read operation");
-    tracker?.updateLabel("get_operation");
-    let op = await getRoutine(opDescriptor, tracker);
-    tracker?.endStep("operation_computation");
+    let op = await getRoutine(opDescriptor);
     let res = await op.execute();
     return res;
 }

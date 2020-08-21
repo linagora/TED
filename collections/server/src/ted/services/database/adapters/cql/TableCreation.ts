@@ -2,7 +2,7 @@ import { TaskTable } from "../../../utils/antiDuplicata";
 import * as myTypes from "../../../utils/myTypes";
 import { delay } from "../../../utils/divers";
 import { globalCounter } from "../../../../index";
-import { Timer, RequestTracker } from "../../../monitoring/Timer";
+import { Timer } from "../../../monitoring/Timer";
 import * as datastaxTools from "./DatastaxTools";
 
 let runningTableCreation = new TaskTable();
