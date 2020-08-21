@@ -37,7 +37,7 @@ export type GetBody =
     limit?:number;
     pageToken?:string;
     where?:WhereClause;
-    advancedSearch:JSON;
+    advancedSearch?:JSON;
 }
 type Order = {
     key:string,

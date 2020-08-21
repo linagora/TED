@@ -39,19 +39,16 @@ export default class BeforeOperation
 
     public save(path:string, callback:BeforeProcess)
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.saves[collectionPath] = callback;
+        this.saves[path] = callback;
     }
 
     public get(path:string, callback:BeforeProcess)
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.gets[collectionPath] = callback;
+        this.gets[path] = callback;
     }
 
     public remove(path:string, callback:BeforeProcess)
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.removes[collectionPath] = callback;
+        this.removes[path] = callback;
     }
 }

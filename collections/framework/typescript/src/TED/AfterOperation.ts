@@ -47,19 +47,16 @@ export default class AfterOperation
 
     public save(path:string, callback:AfterProcess)
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.saves[collectionPath] = callback;
+        this.saves[path] = callback;
     }
 
     public get(path:string, callback:AfterProcess)
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.gets[collectionPath] = callback;
+        this.gets[path] = callback;
     }
 
     public remove(path:string, callback:AfterProcess)
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.removes[collectionPath] = callback;
+        this.removes[path] = callback;
     }
 }

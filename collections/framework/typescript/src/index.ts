@@ -17,7 +17,7 @@ export type HTTPGetBody =
   limit?:number;
   pageToken?:string;
   where?:WhereClause;
-  advancedSearch:JSON;
+  advancedSearch?:JSON;
 }
 type Order = {
   key:string,
@@ -60,27 +60,13 @@ export default class TED {
   public bind(app:express.Express, route:string):void
   {
     let that = this;
-    app.route("/api/collections/*")
+    app.route(route + "/*")
     .put(async function (req, res, next)
     {
       try
       {
         let path = req.path.replace("/api/collections/", "");
-        let collectionPath = TED.getCollectionPath(path);
-        let save:HTTPSaveBody = req.body;
-        let after:boolean = that.after.saves[collectionPath] !== undefined;
-        let tedRequest:SaveRequest = {
-          path: path,
-          body:{
-            action:"save",
-            object:save.object,
-            schema: that.schemas.schemas[collectionPath] !== undefined ? that.schemas.get(collectionPath, save.object) : undefined
-          },
-          afterTask: after
-        };
-        console.log(path);
-        tedRequest = await that.before.runSave(tedRequest, req);
-        let response = await that.db.save(tedRequest);
+        let response = await that.save(path, req.body, req);
         res.send(response);
       }
       catch(err)
@@ -93,31 +79,7 @@ export default class TED {
       try
       {
         let path = req.path.replace("/api/collections/", "");
-        let collectionPath = TED.getCollectionPath(path);
-        let get:HTTPGetBody = req.body;
-        let after:boolean = that.after.gets[collectionPath] !== undefined;
-        let tedRequest:GetRequest = {
-          path:path,
-          body:{
-            action:"get",
-            order:get.order,
-            limit:get.limit,
-            pageToken:get.pageToken,
-            where:get.where,
-            advancedSearch:get.advancedSearch
-          },
-        };
-        console.log(path);
-        tedRequest = await that.before.runGet(tedRequest, req);
-        let response = await that.db.get(tedRequest);
-        if(after)
-        {
-          that.after.run({
-            action:"get",
-            path: path,
-            object: response.queryResults
-          })
-        }
+        let response = that.get(path, req.body, req);
         res.send(response);
       }
       catch(err)
@@ -130,26 +92,80 @@ export default class TED {
       try
       {
         let path = req.path.replace("/api/collections/", "");
-      let collectionPath = TED.getCollectionPath(path);
-      let after:boolean = that.after.removes[collectionPath] !== undefined;
-      let tedRequest:RemoveRequest = {
-        path: path,
-        body:{
-          action:"remove",
-          schema: that.schemas.schemas[collectionPath] !== undefined ? that.schemas.get(collectionPath) : undefined
-        },
-        afterTask: after
-      };
-
-      tedRequest = await that.before.runRemove(tedRequest, req);
-      let response = await that.db.remove(tedRequest);
-      res.send(response);
-    }
-    catch(err)
-    {
-      res.send("Internal error : " + err.message);
-    }
+        let response = await that.remove(path, req);
+        res.send(response);
+      }
+      catch(err)
+      {
+        res.send("Internal error : " + err.message);
+      }
     });
+  }
+
+  public async save(path:string, save:HTTPSaveBody, originalRequest?:any):Promise<any>
+  {
+    let collectionPath = TED.getCollectionPath(path);
+    let after:boolean = this.after.saves[collectionPath] !== undefined;
+    let tedRequest:SaveRequest = {
+      path: path,
+      body:{
+        action: "save",
+        object: save.object,
+        schema: this.schemas.schemas[collectionPath] !== undefined ? this.schemas.get(collectionPath, save.object) : undefined
+      },
+      afterTask: after
+    };
+    console.log(path);
+    tedRequest = await this.before.runSave(tedRequest, originalRequest);
+    let response = await this.db.save(tedRequest);
+    return response;
+  }
+
+  public async get(path:string, get:HTTPGetBody, originalRequest?:any):Promise<any>
+  {
+    let collectionPath = TED.getCollectionPath(path);
+    let after:boolean = this.after.gets[collectionPath] !== undefined;
+    let tedRequest:GetRequest = {
+      path:path,
+      body:{
+        action:"get",
+        order:get.order,
+        limit:get.limit,
+        pageToken:get.pageToken,
+        where:get.where,
+        advancedSearch:get.advancedSearch
+      },
+    };
+    console.log(path);
+    tedRequest = await this.before.runGet(tedRequest, originalRequest);
+    let response = await this.db.get(tedRequest);
+    if(after)
+    {
+      this.after.run({
+        action:"get",
+        path: path,
+        object: response.queryResults
+      })
+    }
+    return response;
+  }
+
+  public async remove(path:string, originalRequest:any):Promise<any>
+  {
+    let collectionPath = TED.getCollectionPath(path);
+    let after:boolean = this.after.removes[collectionPath] !== undefined;
+    let tedRequest:RemoveRequest = {
+      path: path,
+      body:{
+        action:"remove",
+        schema: this.schemas.schemas[collectionPath] !== undefined ? this.schemas.get(collectionPath) : undefined
+      },
+      afterTask: after
+    };
+
+    tedRequest = await this.before.runRemove(tedRequest, originalRequest);
+    let response = await this.db.remove(tedRequest);
+    return response;
   }
 
   public async afterTasks(prefetch:number):Promise<void>
