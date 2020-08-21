@@ -79,7 +79,7 @@ export default class TED {
       try
       {
         let path = req.path.replace("/api/collections/", "");
-        let response = that.get(path, req.body, req);
+        let response = await that.get(path, req.body, req);
         res.send(response);
       }
       catch(err)

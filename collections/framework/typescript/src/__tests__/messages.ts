@@ -15,7 +15,7 @@ ted.server.connect({
 //so TED must be triggered with specific routes
 const app = express();
 app.use(express.json());
-ted.bind(app, "/api/collections/");
+ted.bind(app, "/api/collections");
 
 
 ted.before.save(
@@ -47,6 +47,7 @@ ted.schemas.add("company",{
     default:false,
     content:true,
     auteur:true,
+    pouet:true,
     null:true,
     piege:false
   },

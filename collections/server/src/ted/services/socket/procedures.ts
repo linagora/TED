@@ -7,6 +7,7 @@ import * as myTypes from "../utils/myTypes";
 import { delay } from "../utils/divers";
 import * as config from "./../../../config/config";
 import { RabbitMQBroker, SQSBroker, TaskBroker } from "./../messageBroker/MessageBrokerInterface";
+import { Timer } from "../monitoring/Timer";
 
 export async function login(socket:socketIO.Socket, hash:Buffer):Promise<void>
 {
@@ -32,13 +33,16 @@ export async function login(socket:socketIO.Socket, hash:Buffer):Promise<void>
 
 export async function tedRequest(socket:socketIO.Socket, data:any, callback:any):Promise<void>
 {
+    let timer = new Timer("socket_response")
     try{
         let result = await handleRequest(data.body, data.path, data.afterTask);
         callback(null, result);
+        timer.stop();
     }
     catch(err){
         console.error(err);
         callback(err.message, null);
+        timer.stop();
     }
 }
 
@@ -61,8 +65,6 @@ export async function sendTasks(socket:socketIO.Socket, prefetchCount:number):Pr
                         resolve();
                     }
                 });
-
-                socket.on("disconnect", (reason:any) => {reject(new Error("Socket disconnected : " + reason))})
             }
             catch(error)
             {
@@ -72,6 +74,11 @@ export async function sendTasks(socket:socketIO.Socket, prefetchCount:number):Pr
     };
     let broker = setupBroker(computeTask, prefetchCount);
     broker.runTasks();
+    socket.on("disconnect", (reason:any) => 
+    {
+        broker.stops();
+        console.log(socket.id, " : socket disconnected")
+    })
 }
 
 function setupBroker(callback:any, prefetchCount:number):TaskBroker
@@ -84,7 +91,7 @@ function setupBroker(callback:any, prefetchCount:number):TaskBroker
         }
         case "SQS":
         {
-            return new SQSBroker(callback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, prefetchCount);
+            return new SQSBroker(callback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, prefetchCount, false);
         }
         default:
         {

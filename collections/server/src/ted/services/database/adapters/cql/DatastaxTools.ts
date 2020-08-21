@@ -7,6 +7,7 @@ import { globalCounter } from "../../../../index";
 import { Timer, RequestTracker } from "../../../monitoring/Timer";
 
 let cassandraOptions:cassandra.DseClientOptions;
+let defaultQueryOptions:cassandra.QueryOptions;
 export let client:cassandra.Client;
  
 export async function setup():Promise<void>
@@ -35,6 +36,10 @@ export async function setup():Promise<void>
         sslOptions: sslOptions,
         protocolOptions: {port: 9142}
       };
+      defaultQueryOptions = {
+        prepare: true,
+        consistency: types.consistencies.localQuorum
+      };
       break;
     }
     case "scylladb":
@@ -50,6 +55,9 @@ export async function setup():Promise<void>
         queryOptions: {
           isIdempotent: true
         }
+      };
+      defaultQueryOptions = {
+        prepare: true,
       };
       break;
     }
@@ -70,13 +78,6 @@ export async function setup():Promise<void>
       }
   })
   .then( () => client.connect());
-}
-
-
-
-const defaultQueryOptions:cassandra.QueryOptions = {
-  prepare: true,
-  //consistency: types.consistencies.localQuorum
 }
 
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>

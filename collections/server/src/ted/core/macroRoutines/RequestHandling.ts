@@ -73,38 +73,45 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
     let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request, path, afterTask);
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
     tracker?.endStep("encryption");
-    switch(opDescriptor.action)
+    try
     {
-        case myTypes.action.save:
-        case myTypes.action.remove:
+        switch(opDescriptor.action)
         {
-            let totalResponseTime = new Timer("write_request");
-            tracker?.updateLabel("taskstore_write")
-            await logEvent(opDescriptor, tracker);
-            tracker?.endStep("taskstore_write");
-            if(mbInterface !== null) await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
-            tracker?.endStep("broker_write");
-            tracker?.log();
-            totalResponseTime.stop();
-            return {status: "Success"};
-        }
-        case myTypes.action.get:
-        {
-            let totalResponseTime = new Timer("read_request");
-            tracker?.updateLabel("read_operation");
-            let res = await runReadOperation(opDescriptor, tracker);
-            tracker?.endStep("cassandra_read")
-            myCrypto.decryptResult(res, myCrypto.globalKey);
-            tracker?.endStep("decryption");
-            tracker?.log();
-            totalResponseTime.stop();
-            return res;
-        }
-        default:
-        {
-            throw new Error("Unauthorized operation");
-        }
-    }    
+            case myTypes.action.save:
+            case myTypes.action.remove:
+            {
+                let totalResponseTime = new Timer("write_request");
+                tracker?.updateLabel("taskstore_write")
+                await logEvent(opDescriptor, tracker);
+                tracker?.endStep("taskstore_write");
+                if(mbInterface !== null) await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
+                tracker?.endStep("broker_write");
+                tracker?.log();
+                totalResponseTime.stop();
+                return {status: "Success"};
+            }
+            case myTypes.action.get:
+            {
+                let totalResponseTime = new Timer("read_request");
+                tracker?.updateLabel("read_operation");
+                let res = await runReadOperation(opDescriptor, tracker);
+                tracker?.endStep("cassandra_read")
+                myCrypto.decryptResult(res, myCrypto.globalKey);
+                tracker?.endStep("decryption");
+                tracker?.log();
+                totalResponseTime.stop();
+                return res;
+            }
+            default:
+            {
+                throw new Error("Unauthorized operation");
+            }
+        } 
+    }
+    catch(err)
+    {
+        return {status : "Error", error: err};
+    }
 }
 
 export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<void>

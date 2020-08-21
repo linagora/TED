@@ -175,10 +175,10 @@ export class BatchOperation implements myTypes.GenericOperation
     {
       if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
       {
-        await this.createTable(err.message);
+        await this.createAllTables();
         throw tableCreationError;
       }
-      return {status:"error", error:err};
+      throw err;
     });;
   }
 
@@ -214,7 +214,7 @@ export class BatchOperation implements myTypes.GenericOperation
   {
     let parse = errmsg.match(/[\.a-zA-Z0-9_]*$/);
     if(parse === null) throw new Error("Unable to parse table name in batch error");
-    let tableName = cassandra.keyspace + "." + parse[0];
+    let tableName = parse[0];
     console.log(tableName)
     for(let op of this.operationsArray)
     {

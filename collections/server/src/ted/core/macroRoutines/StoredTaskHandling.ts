@@ -32,9 +32,9 @@ export function setup():void
         {
             console.log("Intializing SQS interface");
 
-            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.taskBroker.queueOptions, config.sqs.taskBroker.messageOptions, config.sqs.taskBroker.prefetchCount);
+            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.taskBroker.queueOptions, config.sqs.taskBroker.messageOptions, config.sqs.taskBroker.prefetchCount, true);
 
-            afterTaskSender = new messageBroker.SQSBroker(dummyCallback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, config.sqs.afetrTaskBroker.prefetchCount);
+            afterTaskSender = new messageBroker.SQSBroker(dummyCallback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, config.sqs.afetrTaskBroker.prefetchCount, false);
             break;
         }
         default:
