@@ -11,7 +11,8 @@
   "jsnext:main": "build/index.es.js",
   "scripts": {
     "build": "rollup -c",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "test:build": "rollup --config rollup_test.config.js"
   },
   "files": [
     "build"
@@ -22,7 +23,7 @@
   },
   "devDependencies": {
     "@types/jest": "^26.0.0",
-    "@types/lodash": "^4.14.155",
+    "@types/lodash": "^4.14.159",
     "jest": "^26.0.1",
     "rollup": "^2.16.1",
     "rollup-plugin-commonjs": "^10.1.0",
@@ -30,6 +31,7 @@
     "rollup-plugin-peer-deps-external": "^2.2.2",
     "rollup-plugin-typescript2": "^0.27.1",
     "ts-jest": "^26.1.0",
-    "typescript": "^3.9.5"
+    "typescript": "^3.9.5",
+    "rollup-plugin-static-files": "^0.1.0"
   }
 }

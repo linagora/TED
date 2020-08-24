@@ -1,29 +1,20 @@
 import RealTimeObject from "./RealTimeObject";
 
 export default class Collection extends RealTimeObject {
+  public async search(_query: any) {
+    //TODO
+    return [];
+  }
 
-    public get(){
-        //TODO
-    }
+  public async save(_document: Document) {
+    //TODO
+  }
 
-    public save(){
-        //TODO
-    }
+  public async remove(_document: Document) {
+    //TODO
+  }
 
-    public remove(){
-        //TODO
-    }
-
-    public getState(){
-        //TODO
-    }
-
-    public undo(){
-        //TODO
-    }
-
-    public redo(){
-        //TODO
-    }
-
+  public getState() {
+    //TODO
+  }
 }

@@ -1,20 +1,20 @@
-import RealTimeObject from "./RealTimeObject/RealTimeObject";
 import Collection from "./RealTimeObject/Collection";
 import Document from "./RealTimeObject/Document";
 
 type DBOptions = {
-  //TODO
-}
+  env: "dev" | "prod";
+};
 
-export default class TwakeCollectionsClient {
+export class TedClient {
+  configuration: DBOptions = {
+    env: "prod",
+  };
 
   /**
    * Configure database connection
    */
-  public configure(
-    options: DBOptions
-  ): void {
-    //TODO
+  public configure(options: { [K in keyof DBOptions]?: DBOptions[K] }): void {
+    this.configuration = Object.assign(this.configuration, options);
   }
 
   /**
@@ -29,8 +29,8 @@ export default class TwakeCollectionsClient {
     primaryKey: {
       [key: string]: string;
     }
-  ): RealTimeObject {
-    return new Collection(type, primaryKey);
+  ): Collection {
+    return new Collection(type, primaryKey, this);
   }
 
   /**
@@ -46,16 +46,18 @@ export default class TwakeCollectionsClient {
     primaryKey: {
       [key: string]: string;
     }
-  ): RealTimeObject {
-    return new Document(type, primaryKey);
+  ): Document {
+    return new Document(type, primaryKey, this);
   }
 
   /**
    * Be informed when network is lost and obtained again
    */
   public onStatusChange(
-    callback: (status: boolean, reason: string) => void
+    _callback: (status: boolean, reason: string) => void
   ): void {
     //TODO
   }
 }
+
+export default new TedClient();
