@@ -10,6 +10,8 @@ export class TedClient {
     env: "prod",
   };
 
+  collections: { [key: string]: Collection } = {};
+
   /**
    * Configure database connection
    */
@@ -30,7 +32,19 @@ export class TedClient {
       [key: string]: string;
     }
   ): Collection {
-    return new Collection(type, primaryKey, this);
+    const collection = new Collection(type, primaryKey, this);
+    const collectionKeyIdentifier = collection.getPrimaryKeyStringIdentifier(
+      primaryKey
+    );
+
+    //Return the pre-existing collection if exists
+    this.collections[type] = this.collections[type] || {};
+    if (this.collections[type][collectionKeyIdentifier]) {
+      return this.collections[type][collectionKeyIdentifier];
+    }
+    this.collections[type][collectionKeyIdentifier] = collection;
+
+    return collection;
   }
 
   /**
@@ -47,7 +61,19 @@ export class TedClient {
       [key: string]: string;
     }
   ): Document {
-    return new Document(type, primaryKey, this);
+    const parent_collection = this.collection(type, primaryKey);
+
+    const document = new Document(type, primaryKey, this);
+    const documentKeyIdentifier = document.getPrimaryKeyStringIdentifier(
+      primaryKey
+    );
+
+    if (parent_collection.documents[documentKeyIdentifier]) {
+      return parent_collection.documents[documentKeyIdentifier];
+    }
+    parent_collection.documents[documentKeyIdentifier] = document;
+
+    return document;
   }
 
   /**

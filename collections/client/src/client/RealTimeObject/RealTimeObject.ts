@@ -19,15 +19,22 @@ export default class RealTimeObject {
 
     //Debug collections in the console
     if (window && tedClientInstance.configuration.env === "dev") {
-      (window as any).ted = (window as any).ted || {};
-      (window as any).ted[this.collectionType] =
-        (window as any).ted[this.collectionType] || {};
-      (window as any).ted[this.collectionType][
+      (window as any).ted_collections = (window as any).ted_collections || {};
+      const ted_collections = (window as any).ted_collections;
+      ted_collections[this.collectionType] =
+        ted_collections[this.collectionType] || {};
+      ted_collections[this.collectionType][
         Object.keys(this.collectionId)
           .map((key) => key + "=" + this.collectionId[key])
           .join(";")
       ] = this;
     }
+  }
+
+  public getPrimaryKeyStringIdentifier(primaryKey: { [key: string]: string }) {
+    return Object.keys(primaryKey)
+      .map((item) => item + "-" + primaryKey[item])
+      .join("-");
   }
 
   /**
@@ -48,6 +55,10 @@ export default class RealTimeObject {
 
   public unsubscribe() {
     //TODO
+  }
+
+  public publish(_type: string, _event: any) {
+    //TODO: publish arbitrary data on this channel (ex. is writting data)
   }
 }
 
