@@ -34,7 +34,7 @@ export function setup():void
 
             mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.taskBroker.queueOptions, config.sqs.taskBroker.messageOptions, config.sqs.taskBroker.prefetchCount, true);
 
-            afterTaskSender = new messageBroker.SQSBroker(dummyCallback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, config.sqs.afetrTaskBroker.prefetchCount, false);
+            afterTaskSender = new messageBroker.SQSBroker(dummyCallback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, 0, false);
             break;
         }
         default:

@@ -4,9 +4,9 @@ import { delay } from "../../../utils/divers";
 import * as mongoDBTools from "./MongoDBtools";
 import { globalCounter } from "../../../../index";
 import { Timer } from "../../../monitoring/Timer";
-import { table } from "console";
+import { ted } from "../../../../../config/config";
 
-let runningTableCreation = new TaskTable();
+let runningTableCreation = new TaskTable(ted.maxTableCreation);
 
 export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
 {

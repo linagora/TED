@@ -4,9 +4,9 @@ import { delay } from "../../../utils/divers";
 import { globalCounter } from "../../../../index";
 import { Timer } from "../../../monitoring/Timer";
 import * as datastaxTools from "./DatastaxTools";
-import { cassandra } from "../../../../../config/config";
+import { cassandra, ted } from "../../../../../config/config";
 
-let runningTableCreation = new TaskTable();
+let runningTableCreation = new TaskTable(ted.maxTableCreation);
 
 export async function createTable(tableDefinition:myTypes.TableDefinition):Promise<void>
 {
