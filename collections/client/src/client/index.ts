@@ -3,11 +3,19 @@ import Document from "./RealTimeObject/Document";
 
 type DBOptions = {
   env: "dev" | "prod";
+  server: {
+    http: string;
+    socket: string;
+  };
 };
 
 export class TedClient {
   configuration: DBOptions = {
     env: "prod",
+    server: {
+      http: "http://localhost:8080/",
+      socket: "ws://localhost:8081/",
+    },
   };
 
   collections: { [key: string]: Collection } = {};
@@ -33,15 +41,16 @@ export class TedClient {
     }
   ): Collection {
     const collection = new Collection(type, primaryKey, this);
-    const collectionKeyIdentifier = collection.getPrimaryKeyStringIdentifier(
-      primaryKey
-    );
+    const collectionKeyIdentifier = collection.getPrimaryKeyStringIdentifier({
+      reduced: true,
+    });
 
     //Return the pre-existing collection if exists
     this.collections[type] = this.collections[type] || {};
     if (this.collections[type][collectionKeyIdentifier]) {
       return this.collections[type][collectionKeyIdentifier];
     }
+    console.log("create collection ", collectionKeyIdentifier);
     this.collections[type][collectionKeyIdentifier] = collection;
 
     return collection;
@@ -64,9 +73,9 @@ export class TedClient {
     const parent_collection = this.collection(type, primaryKey);
 
     const document = new Document(type, primaryKey, this);
-    const documentKeyIdentifier = document.getPrimaryKeyStringIdentifier(
-      primaryKey
-    );
+    const documentKeyIdentifier = document.getPrimaryKeyStringIdentifier({
+      reduced: true,
+    });
 
     if (parent_collection.documents[documentKeyIdentifier]) {
       return parent_collection.documents[documentKeyIdentifier];

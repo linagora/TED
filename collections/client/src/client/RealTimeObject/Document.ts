@@ -10,13 +10,37 @@ export default class Document extends RealTimeObject {
     tedClientInstance: TedClient
   ) {
     super(type, primaryKey, tedClientInstance);
+    this.validatePrimaryKey(false);
+  }
 
-    //Update primaryKey to remove any unwanted keys (all keys must correspond to type path)
-    //Ex. For the document /company/channel/message (a specific message)
-    //      we should define the keys {company: "", channel: "", message: ""}
-    //    If message is not defined, an id will be generated in frontend (object added)
-    //      in this case the id will take the form temp:some_id (old "front_id")
-    //TODO and catch a warning if not enough keys (message is the only optionnal key)
+  /**
+   * If the document was persisted, then we know the correct server id.
+   * We can override our frontend generated identifier
+   * @param id the new id
+   */
+  public updateTempPrimaryKey(id: string) {
+    const idKey = this.collectionType.split("/").pop();
+    if (idKey) {
+      const tempIdentifier = this.getPrimaryKeyStringIdentifier({
+        reduced: true,
+      });
+      this.collectionId[idKey] = id;
+
+      const collection = this.tedInstance.collection(
+        this.collectionType,
+        this.collectionId
+      );
+
+      delete collection.documents[tempIdentifier];
+      collection.documents[
+        this.getPrimaryKeyStringIdentifier({
+          reduced: true,
+        })
+      ] = this;
+
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -31,10 +55,6 @@ export default class Document extends RealTimeObject {
    * Remove a document
    */
   public async remove() {
-    //TODO
-  }
-
-  public getState() {
     //TODO
   }
 }

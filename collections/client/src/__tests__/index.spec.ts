@@ -1,40 +1,54 @@
 import ted from "../client/index";
+const sleep = (m: any) => new Promise((r) => setTimeout(r, m));
 
 ted.configure({
   env: "dev",
+  server: {
+    http: "http://localhost:8080/",
+    socket: "ws://localhost:8080/",
+  },
 });
 
-const messagesCollection = ted.collection("company/channel/message", {
-  company: "",
-  channel: "",
-});
-
-messagesCollection.subscribe((event) => {
-  //Will send all the known data on the first call
-  console.log(event);
-});
-
-//Publish is used to send arbitrary data over an existing secured and authenticated realtime collection/document
-messagesCollection.publish("writing_user", {
-  user: "some_id",
-});
-
-messagesCollection.unsubscribe();
-
-messagesCollection
-  .search("some keyword" || { content: "some keywords" })
-  .then((results) => {
-    console.log(results);
+(async () => {
+  const messagesCollection = ted.collection("company/channel/message", {
+    company: "3",
+    channel: "14",
   });
 
-const messageDocument = ted.document("company/channel/message", {
-  company: "",
-  channel: "",
-  message: "",
-});
+  messagesCollection.subscribe((event) => {
+    //Will send all the known data on the first call
+    console.log(event);
+  });
 
-messageDocument.update({
-  content: "coucou",
-});
+  await sleep(100);
 
-messageDocument.remove();
+  //Publish is used to send arbitrary data over an existing secured and authenticated realtime collection/document
+  messagesCollection.publish("writing_user", {
+    user: "1",
+  });
+
+  messagesCollection.unsubscribe();
+
+  messagesCollection
+    .search("some keyword" || { content: "some keywords" })
+    .then((results) => {
+      console.log(results);
+    });
+
+  const messageDocument = ted.document("company/channel/message", {
+    company: "3",
+    channel: "14",
+    message: "209",
+  });
+
+  const newMessageDocument = ted.document("company/channel/message", {
+    company: "3",
+    channel: "14",
+  });
+
+  newMessageDocument.update({
+    content: "Hello World",
+  });
+
+  messageDocument.remove();
+})();

@@ -13,11 +13,7 @@ export default class Collection extends RealTimeObject {
     tedClientInstance: TedClient
   ) {
     super(type, primaryKey, tedClientInstance);
-
-    //Update primaryKey to remove any unwanted keys (all keys must correspond to type path)
-    //Ex. for the collection /company/channel/message (list of message in channel)
-    //    we should define the keys {company: "", channel: ""} (message is not defined here because this is a collection of messages, not a message)
-    //TODO and catch a warning if not enough keys
+    this.validatePrimaryKey(true);
   }
 
   public async search(_query: any) {
@@ -30,10 +26,6 @@ export default class Collection extends RealTimeObject {
   }
 
   public async remove(_document: Document) {
-    //TODO
-  }
-
-  public getState() {
     //TODO
   }
 }
