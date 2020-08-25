@@ -56,7 +56,7 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
         collections: opDescriptor.collections,
         options: {
             where:{
-                field: opDescriptor.collections.slice(-1)[0],
+                key: opDescriptor.collections.slice(-1)[0],
                 value: matchingIDs,
                 operator: myTypes.Operator.in
             }

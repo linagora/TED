@@ -9,6 +9,7 @@ import { setup as cassandraSetup, client as cassandraClient} from "./services/da
 import { TimerLogsMap, Timer } from "./services/monitoring/Timer";
 import { CounterMap } from "./services/monitoring/Counter";
 import { setup as promSetup } from "./services/monitoring/PrometheusClient";
+import { setup as mongoSetup } from "./services/database/adapters/sql/MongoDBtools";
 import * as config from "../config/config";
 import * as promClient from "prom-client";
 
@@ -30,7 +31,10 @@ async function setup():Promise<void>
   mbSetup();
   cryptoSetup();
   promSetup();
-  await cassandraSetup();
+  if(["cassandra", "scylladb", "keyspace"].includes(config.ted.dbCore))
+    await cassandraSetup();
+  else if(["mongodb"].includes(config.ted.dbCore))
+    await mongoSetup();
 }
 
 async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerRequest>
@@ -68,11 +72,13 @@ async function main():Promise<void>
   .catch( (err:myTypes.CQLResponseError) =>
   {
     console.error(err);
-    if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+    if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
     {
       console.log("TaskStore doesn't exist, nothing to fast forward.");
+      console.log(err.message.match(/^Collection ([a-zA-z_]*) does not exist./));
       return;
     }
+    console.log("oups")
     throw err;
   });
 

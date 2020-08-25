@@ -1,7 +1,7 @@
 import * as myTypes from "../../services/utils/myTypes";
 import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
-import getRoutine from "./GetRoutine";
+import getRoutine, { EmptyResultError } from "./GetRoutine";
 import * as myCrypto from "../../services/utils/cryptographicTools";
 import { SaveTaskStore } from "../tedOperations/TaskStore";
 import { BatchOperation, tableCreationError } from "../../services/database/operations/baseOperations";
@@ -48,7 +48,6 @@ export async function createOperation(opDescriptor:myTypes.InternalOperationDesc
 
 export function getInternalOperationDescription(request:myTypes.ServerRequestBody, path:string, afterTask?:boolean):myTypes.InternalOperationDescription
 {
-    console.log(request);
     let processedPath = processPath(path);
     let opDescriptor:myTypes.InternalOperationDescription = {
         action: request.action,
@@ -59,18 +58,20 @@ export function getInternalOperationDescription(request:myTypes.ServerRequestBod
         options: request.options,
         schema: request.schema,
         secondaryInfos: request.where === undefined ? undefined : {
-            secondaryKey: request.where.field,
+            secondaryKey: request.where.key,
             secondaryValue: request.where.value,
             operator: request.where.operator
         },
         afterTask: afterTask
     }
+    console.log(opDescriptor);
     return opDescriptor;
 }
 
 export default async function handleRequest(request:myTypes.ServerRequestBody, path:string, afterTask?:boolean):Promise<myTypes.ServerAnswer>
 {
     let opDescriptor:myTypes.InternalOperationDescription = getInternalOperationDescription(request, path, afterTask);
+    controlRequest(opDescriptor);
     myCrypto.encryptOperation(opDescriptor, myCrypto.globalKey);
     try
     {
@@ -103,6 +104,7 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
     }
     catch(err)
     {
+        if(err === EmptyResultError) return {status:"Success", queryResults:{resultCount:0}};
         return {status : "Error", error: err};
     }
 }
@@ -110,8 +112,8 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
 export async function logEvent(opDescriptor:myTypes.InternalOperationDescription, timer?:Timer):Promise<void>
 {
     if(timer === undefined) timer = new Timer("taskstore_write");
-    let enableIsolation = config.cassandra.core !== "keyspace";
-    let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], enableIsolation);
+    let enableIsolation = config.ted.dbCore !== "keyspace";
+    let opWrite = new BatchOperation([new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)], false);
     try
     {
         await opWrite.execute();
@@ -119,6 +121,7 @@ export async function logEvent(opDescriptor:myTypes.InternalOperationDescription
     }
     catch(err)
     {
+        console.error(err);
         if(err === tableCreationError)
         {
             await delay(1000);
@@ -174,4 +177,26 @@ async function runReadOperation(opDescriptor:myTypes.InternalOperationDescriptio
     let op = await getRoutine(opDescriptor);
     let res = await op.execute();
     return res;
+}
+
+function controlRequest(opDescriptor:myTypes.InternalOperationDescription):void
+{
+    switch(opDescriptor.action)
+    {
+        case myTypes.action.save:
+        {
+            if(opDescriptor.clearObject === undefined) throw new Error("missing object in save operation");
+            if(opDescriptor.documents.length !== opDescriptor.collections.length) throw new Error("Invalid path for save operation");
+            break;
+        }
+        case myTypes.action.get:
+        {
+            break;
+        }
+        case myTypes.action.remove:
+        {
+            if(opDescriptor.collections.length !== opDescriptor.documents.length) throw new Error("Collection delete not yet implemented");
+            break;
+        }
+    }
 }

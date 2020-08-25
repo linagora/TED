@@ -118,7 +118,7 @@ export type ServerSideObject = {
 };
 
 export type DBentry = {
-  [key:string]:string; //key=collections, values = documents
+  [key:string]:any; //key=collections, values = documents
 };
 
 export type EncObject = {
@@ -174,7 +174,7 @@ export type SecondaryInfos = {
 
 export type WhereClause = {
   operator:Operator;
-  field:string;
+  key:string;
   value:any;
 }
 

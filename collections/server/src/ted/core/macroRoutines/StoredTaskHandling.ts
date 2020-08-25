@@ -76,7 +76,10 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
             limit: config.ted.taskStoreBatchSize
         }
     })
+    console.log("reading DB");
     let result = await getOperation.execute();
+    console.log("pending operation : ", result.queryResults);
+
     if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query pending operations on given path : " + path);
     timer.stop();
     return result.queryResults.allResultsEnc;
@@ -116,24 +119,31 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
 
 export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    let timer = new Timer("collection_forwarding");
-    let path:string = buildPath(opDescriptor.collections, opDescriptor.documents, true);
-    console.log("collection to forward", path);
-    let operationsToForward:myTypes.DBentry[]
-    do
+    try
     {
-        operationsToForward = await getPendingOperations(path);
-        for(let op of operationsToForward)
+        let timer = new Timer("collection_forwarding");
+        let path:string = buildPath(opDescriptor.collections, opDescriptor.documents, true);
+        console.log("collection to forward", path);
+        let operationsToForward:myTypes.DBentry[]
+        do
         {
-            await runPendingOperation(op, true);
-        }
-    }while(operationsToForward.length == config.ted.taskStoreBatchSize )
-    timer.stop();
+            operationsToForward = await getPendingOperations(path);
+            for(let op of operationsToForward)
+            {
+                await runPendingOperation(op, true);
+            }
+        }while(operationsToForward.length == config.ted.taskStoreBatchSize )
+        timer.stop();
+    }
+    catch(err)
+    {
+    }
+
 }
 
 async function getAllOperations():Promise<myTypes.DBentry[]>
 {
-    let timer = new Timer("taskstore_write");
+    let timer = new Timer("taskstore_read");
     let getOperation = new GetTaskStore({
         action: myTypes.action.get,
         opID: "null",
@@ -146,8 +156,9 @@ async function getAllOperations():Promise<myTypes.DBentry[]>
         keyOverride: {}
     })
     let result = await getOperation.execute();
-    if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query all pending operations");
     timer.stop();
+    if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined)
+        return [];
     return result.queryResults.allResultsEnc;
 }
 

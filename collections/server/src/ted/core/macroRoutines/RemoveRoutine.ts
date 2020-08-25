@@ -26,7 +26,7 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
                     let value = previousValue[key];
                     if(TStoCQLtypes.get(typeof(value)) !== undefined)
                     {
-                        opArray.push(getRemoveSecondaryView(opDescriptor, createSecondaryInfos(previousValue, key)));
+                        opArray.push(getRemoveSecondaryView(opDescriptor, {secondaryValue: previousValue[key], secondaryKey: key, operator: myTypes.Operator.eq}));
                     }
                 }
             }

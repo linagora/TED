@@ -46,10 +46,14 @@ export default class SchemasTable
         {
             keys = []
             let set:Set<string> = new Set();
-            Object.keys(schema).forEach( (key:string) => {
-                if(key !== "default") set.add(key);
+            Object.values(schema).forEach( (schemaDescriptor) => 
+            {
+                Object.keys(schemaDescriptor).forEach( (key:string) => {
+                    if(key !== "default") set.add(key);
+                });
             });
             set.forEach( (value:string) => {keys.push(value)});
+            console.log(keys);
         }
 
         return {

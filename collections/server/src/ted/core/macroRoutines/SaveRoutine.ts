@@ -47,7 +47,7 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     catch(err)
     {   
         console.error(err);
-        if((err === noPreviousValue || err.message.substr(0,18) === "unconfigured table")  )
+        if((err === noPreviousValue || err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
         {
             if(opDescriptor.schema !== undefined)
             {

@@ -10,20 +10,20 @@ export let client:cassandra.Client;
  
 export async function setup():Promise<void>
 {
-  switch(config.cassandra.core)
+  switch(config.ted.dbCore)
   {
     case "keyspace":
     {
-      const auth = new cassandra.auth.PlainTextAuthProvider(config.cassandra.keyspaceID, config.cassandra.keyspaceKey);
+      const auth = new cassandra.auth.PlainTextAuthProvider(config.keyspace.keyspaceID, config.keyspace.keyspaceKey);
       const sslOptions = {
         ca: [readFileSync("src/config/AmazonRootCA1.pem", 'utf-8')],
-        host: config.cassandra.contactPoint[0],
+        host: config.keyspace.contactPoint[0],
         rejectUnauthorized: true
       };
       cassandraOptions = {
-        contactPoints: config.cassandra.contactPoint,
-        localDataCenter: config.cassandra.localDatacenter,
-        keyspace: config.cassandra.keyspace,
+        contactPoints: config.keyspace.contactPoint,
+        localDataCenter: config.keyspace.localDatacenter,
+        keyspace: config.keyspace.keyspace,
         policies: {
           retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
         },

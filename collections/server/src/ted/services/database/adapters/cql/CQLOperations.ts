@@ -15,7 +15,7 @@ export abstract class CQLBaseOperation implements myTypes.DBDirectOperation
   constructor(infos:myTypes.CQLOperationInfos)
   {
     this.action = infos.action;
-    this.table = infos.table;
+    this.table = "cassandra_collections." + infos.table;
     this.entry = infos.keys;
     this.query = null;
   }
@@ -141,7 +141,7 @@ export class CQLGetOperation extends CQLBaseOperation
     {
       if(primaryKey.params.length > 0) res.push("AND");
       else res.push("WHERE");
-      res.push(this.where.field);
+      res.push(this.where.key);
       res.push(this.where.operator);
       res.push("?");
       params.push(this.where.value);

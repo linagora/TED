@@ -107,6 +107,7 @@ export class RabbitMQBroker extends TaskBroker
                     this.channel?.ack(msg);
                 }
                 catch(err){
+                    console.error(err);
                     await delay(this.rejectionTimeout);
                     this.channel?.reject(msg);
                 }
