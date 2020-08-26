@@ -1,8 +1,27 @@
 import * as myTypes from "../../utils/myTypes";
 import { cassandra, ted } from "../../../../config/config";
-import { CQLBaseOperation, CQLSaveOperation, CQLGetOperation, CQLRemoveOperation, CQLBatchOperation, CQLOperationArray } from "../adapters/cql/CQLOperations";
+import { CQLBaseOperation, CQLSaveOperation, CQLGetOperation, CQLRemoveOperation, CQLBatchOperation, CQLOperationArray, CQLOperation } from "../adapters/cql/CQLOperations";
+import { SQLBaseOperation, SQLSaveOperation, SQLGetOperation, SQLRemoveOperation, SQLOperationArray, SQLBatchOperation } from "../adapters/sql/SQLOperations";
+import { createTable as cqlCreateTable} from "./../adapters/cql/TableCreation";
+import { createTable as sqlCreateTable } from "./../adapters/sql/TableCreation";
 
 export const tableCreationError:Error = new Error("Table creation needed, canceling operation");
+
+export let createTable:(def:myTypes.TableDefinition) => Promise<void>;
+
+
+let core:"SQL" | "CQL" | undefined;
+if(["cassandra", "scylladb", "keyspace"].includes(ted.dbCore))
+{
+  core = "CQL";
+  createTable = cqlCreateTable;
+}
+else if(["mongodb"].includes(ted.dbCore))
+{
+  core = "SQL";
+  createTable = sqlCreateTable;
+}
+else throw new Error("Unknown database core");
 
 export abstract class BaseOperation implements myTypes.GenericOperation
 {
@@ -11,7 +30,7 @@ export abstract class BaseOperation implements myTypes.GenericOperation
   documents:string[];
   table:string|null;
   opID:string;
-  operation:CQLBaseOperation | null;
+  operation:CQLBaseOperation | SQLBaseOperation | null;
 
   canCreateTable:boolean;
   
@@ -53,7 +72,7 @@ export abstract class BaseOperation implements myTypes.GenericOperation
 
   public buildTableName():string
   {
-    let res:string[] = [cassandra.keyspace,"."];
+    let res:string[] = [];
     for(let i:number = 0; i<this.collections.length; i++)
     {
       res.push(this.collections[i]);
@@ -86,12 +105,24 @@ export abstract class SaveOperation extends BaseOperation
     if(this.object === undefined) throw new Error("Operation entry undefined");
     if(this.table === null) throw new Error("Undefined table");
     let entry = this.buildEntry();
-    this.operation = new CQLSaveOperation({
-      action: this.action,
-      keys: entry,
-      table: this.table,
-      options: (this.options === undefined ? {} : this.options)
-    })
+    if(core === "CQL")
+    {
+      this.operation = new CQLSaveOperation({
+        action: this.action,
+        keys: entry,
+        table: this.table,
+        options: (this.options === undefined ? {} : this.options)
+      });
+    }
+    else
+    {
+      this.operation = new SQLSaveOperation({
+        action: this.action,
+        keys: entry,
+        table: this.table,
+        options: (this.options === undefined ? {} : this.options)
+      })
+    }
   }
 
   protected buildEntry():myTypes.DBentry
@@ -118,12 +149,24 @@ export abstract class GetOperation extends BaseOperation
   {
     if(this.table === null) throw new Error("Undefined table");
     let entry = this.buildEntry();
-    this.operation = new CQLGetOperation({
-      action: this.action,
-      keys: entry,
-      table: this.table,
-      options: (this.options === undefined ? {} : this.options)
-    });
+    if(core === "CQL")
+    {
+      this.operation = new CQLGetOperation({
+        action: this.action,
+        keys: entry,
+        table: this.table,
+        options: (this.options === undefined ? {} : this.options)
+      });
+    }
+    else
+    {
+      this.operation = new SQLGetOperation({
+        action: this.action,
+        keys: entry,
+        table: this.table,
+        options: (this.options === undefined ? {} : this.options)
+      });
+    }
   }
 };
 
@@ -139,11 +182,22 @@ export abstract class RemoveOperation extends BaseOperation
   {
     if(this.table === null) throw new Error("Undefined table");
     let entry = this.buildEntry();
-    this.operation = new CQLRemoveOperation({
-      action: this.action,
-      keys: entry,
-      table: this.table,
-    });
+    if(core === "CQL")
+    {
+      this.operation = new CQLRemoveOperation({
+        action: this.action,
+        keys: entry,
+        table: this.table,
+      });
+    }
+    else
+    {
+      this.operation = new SQLRemoveOperation({
+        action: this.action,
+        keys: entry,
+        table: this.table,
+      });
+    }
   }
 };
 
@@ -152,7 +206,7 @@ export class BatchOperation implements myTypes.GenericOperation
   action:myTypes.action;
   operationsArray:BaseOperation[];
   isolation:boolean;
-  operation: CQLBatchOperation | CQLOperationArray | null;
+  operation: CQLBatchOperation | CQLOperationArray | SQLBaseOperation | SQLOperationArray | null;
 
   constructor(batch:BaseOperation[], isolation:boolean)
   {
@@ -170,16 +224,17 @@ export class BatchOperation implements myTypes.GenericOperation
   {
     this.buildOperation();
     if(this.operation === null) throw new Error("Error in batch, operation not built");
+    console.log("batch operation :", this.operation);
     return this.operation.execute()
     .catch(async (err:myTypes.CQLResponseError) =>
     {
-      if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+      if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
       {
         await this.createAllTables();
         throw tableCreationError;
       }
-      return {status:"error", error:err};
-    });;
+      throw err;
+    });
   }
 
   public push(operation:BaseOperation)
@@ -190,14 +245,28 @@ export class BatchOperation implements myTypes.GenericOperation
 
   protected buildOperation():void
   {
-    let cqlOperationArray:CQLBaseOperation[] = [];
-    for(let op of this.operationsArray)
+    if(core === "CQL")
     {
-      if(op.operation === null) throw new Error("Batch error, a base operation is not built");
-      cqlOperationArray.push(op.operation);
+      let cqlOperationArray:CQLBaseOperation[] = [];
+      for(let op of this.operationsArray)
+      {
+        if(op.operation === null) throw new Error("Batch error, a base operation is not built");
+        cqlOperationArray.push(op.operation as CQLBaseOperation);
+      }
+      if(this.isolation) this.operation = new CQLBatchOperation(cqlOperationArray);
+      else this.operation = new CQLOperationArray(cqlOperationArray);
     }
-    if(this.isolation) this.operation = new CQLBatchOperation(cqlOperationArray);
-    else this.operation = new CQLOperationArray(cqlOperationArray);
+    else
+    {
+      let sqlOperationArray:SQLBaseOperation[] = [];
+      for(let op of this.operationsArray)
+      {
+        if(op.operation === null) throw new Error("Batch error, a base operation is not built");
+        sqlOperationArray.push(op.operation as SQLBaseOperation);
+      }
+      if(this.isolation) this.operation = new SQLBatchOperation(sqlOperationArray);
+      else this.operation = new SQLOperationArray(sqlOperationArray);
+    }
   }
 
   protected async createAllTables():Promise<void>
@@ -215,6 +284,7 @@ export class BatchOperation implements myTypes.GenericOperation
     let parse = errmsg.match(/[\.a-zA-Z0-9_]*$/);
     if(parse === null) throw new Error("Unable to parse table name in batch error");
     let tableName = parse[0];
+    console.log(tableName)
     for(let op of this.operationsArray)
     {
       let tmp = op.buildTableName();

@@ -1,19 +1,27 @@
 
 //=============== Sentry config ===============
 
-export const sentry:boolean = false;
-export const sentryDSN:string = "/* enter sentryDSN here */"; 
+export const sentry =
+{
+    sentry: false,
+    DSN: "enter DSN here",
+} 
 
 //=============== Cassandra config ===============
 
-export const cassandraKeyspace:string = "twake_collections";
-export const cassandraContactPoint:string[] = ["127.0.0.1"];
-export const cassandraLocalDatacenter:string = "datacenter1";
-export const defaultCassandraKeyspaceOptions = 
+export const cassandra = 
 {
-    class:"SimpleStrategy",
-    replication_factor:3
-};
+    core:"cassandra",
+    keyspace: "cassandra_collections",
+    contactPoint: ["127.0.0.1"],
+    localDatacenter: "datacenter1",
+    defaultCassandraKeyspaceOptions: {
+        class:"SimpleStrategy",
+        replication_factor:3
+    },
+    keyspaceID:"",
+    keyspaceKey:""
+}
 
 //=============== Redis config ===============
 
@@ -21,25 +29,82 @@ export const redisNamespace:string = "twake_collections";
 
 //=============== RabbitMQ config ===============
 
-export const amqpQueueName:string = "projection_tasks";
-export const amqpURL:string = "amqp://localhost";
-export const amqpQueueOptions = {
-    durable:  true
-};
-export const amqpMessageOptions = {
-    persistent: true
+export const rabbitmq =
+{
+    taskBroker:{
+        queueName: "projection_tasks",
+        URL: "amqp://localhost",
+        queueOptions:{
+            durable:  true
+        },
+        messageOptions:{
+            persistent: true
+        },
+        prefetchCount:1,
+        rejectionTimeout: 10000
+    },
+    afterTaskBroker:{
+        queueName: "after_tasks",
+        URL: "amqp://localhost",
+        queueOptions:{
+            durable:  true
+        },
+        messageOptions:{
+            persistent: true
+        },
+        prefetchCount:10,
+        rejectionTimeout: 1000
+    },
+}
+
+//=============== SQS config ===============
+
+export const sqs = {
+    region: "eu-central-1",
+    accessID: "",
+    accessKey: "",
+    taskBroker:{
+        queueOptions:{
+            QueueName: "projection_tasks.fifo",
+            Attributes:{
+                FifoQueue: "true",
+                VisibilityTimeout: "60"
+            }
+        },
+        messageOptions: {},
+        prefetchCount:1
+    },
+    afetrTaskBroker:{
+        queueOptions:{
+            QueueName: "after_tasks",
+            Attributes:{
+                VisibilityTimeout: "60"
+            }
+        },
+        messageOptions: {},
+        prefetchCount:10
+    }
+
 }
 
 //=============== Crypto setup ===============
 
-export const cryptoAlgorithm:string = "aes-256-gcm";
-export const keyLen:number = 32; //needs to be adapted to the chosen algorithm (in bytes)
-export const password:string = "0000" //choose another hex buffer of arbitrary size
-export const salt:string = "00000000000000000000000000000000"; //take another random 16 bytes random buffer
-
+export const crypto =
+{
+    algorithm: "aes-256-gcm",
+    keyLen: 32,
+    password: "0000",
+    salt: "00000000000000000000000000000000"
+}
 
 //=============== TED config ===============
 
-export const taskStoreBatchSize:number = 1;
-export const defaultTaskStoreTTL:number = 3600;
-export const broker:string = "RabbitMQ";
+export const ted =
+{
+    password:"ceci est un mot de passe",
+    taskStoreBatchSize: 1,
+    defaultTaskStoreTTL: 3600,
+    broker: "SQS",
+    maxTableCreation: 2,
+    enableMultiTableCreation: true
+}

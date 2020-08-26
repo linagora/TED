@@ -1,7 +1,7 @@
 import * as myTypes from "../../services/utils/myTypes";
 import { buildPath } from "../../services/utils/divers";
 import { ted, cassandra } from "../../../config/config";
-import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { createTable } from "../../services/database/operations/baseOperations";
 import { SaveOperation, tableCreationError, GetOperation, RemoveOperation } from "../../services/database/operations/baseOperations";
 
 export class SaveTaskStore extends SaveOperation
@@ -17,7 +17,6 @@ export class SaveTaskStore extends SaveOperation
             encObject: SaveTaskStore.createLog(operation)
         });
         if(this.options === undefined) this.options = {};
-        //this.options.ttl = ted.defaultTaskStoreTTL;
         this.canCreateTable = true;
         this.table = this.buildTableName();
         this.buildOperation();
@@ -28,11 +27,12 @@ export class SaveTaskStore extends SaveOperation
       return await super.execute()
       .catch(async (err:myTypes.CQLResponseError) =>
       {
-        if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+        if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
         {
           await this.createTable();
           throw tableCreationError;
         }
+        console.error(err);
         return {status:"error", error:err};
       });
     }
@@ -63,7 +63,7 @@ export class SaveTaskStore extends SaveOperation
 
     public buildTableName():string
     {
-        return cassandra.keyspace + ".global_taskstore";
+        return "global_taskstore";
     }
 
     public async createTable():Promise<void>
@@ -95,7 +95,7 @@ export class GetTaskStore extends GetOperation
 
     public buildTableName():string
     {
-        return cassandra.keyspace + ".global_taskstore";
+        return "global_taskstore";
     }
 
     protected buildEntry():myTypes.DBentry
@@ -121,7 +121,7 @@ export class RemoveTaskStore extends RemoveOperation
 
     public buildTableName():string
     {
-        return cassandra.keyspace + ".global_taskstore";
+        return "global_taskstore";
     }
 
     protected buildEntry():myTypes.DBentry

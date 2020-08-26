@@ -4,11 +4,16 @@ import * as messageBroker from "../../services/messageBroker/MessageBrokerInterf
 import { GetTaskStore, RemoveTaskStore } from "../tedOperations/TaskStore";
 import { runWriteOperation } from "./RequestHandling";
 import { globalCounter } from "../../index";
-import { Timer, RequestTracker } from "../../services/monitoring/Timer";
+import { Timer } from "../../services/monitoring/Timer";
 import { tableCreationError } from "../../services/database/operations/baseOperations";
 import { delay, buildPath, processPath } from "../../services/utils/divers";
+import * as myCrypto from "../../services/utils/cryptographicTools";
+import { GetMainView } from "../tedOperations/MainProjections";
+import { sendToSocket } from "../../services/socket/sockectServer";
+import { Organizations } from "aws-sdk";
 
 export let mbInterface:messageBroker.TaskBroker|null;
+export let afterTaskSender:messageBroker.TaskBroker|null;
 
 export function setup():void
 {
@@ -17,19 +22,26 @@ export function setup():void
         case "RabbitMQ":
         {
             console.log("Intializing RabbitMQ interface");
-            mbInterface = new messageBroker.RabbitMQBroker(config.rabbitmq.URL, config.rabbitmq.queueName, projectTask, config.rabbitmq.queueOptions, config.rabbitmq.messageOptions);
+
+            mbInterface = new messageBroker.RabbitMQBroker(config.rabbitmq.taskBroker.URL, config.rabbitmq.taskBroker.queueName, projectTask, config.rabbitmq.taskBroker.queueOptions, config.rabbitmq.taskBroker.messageOptions, config.rabbitmq.taskBroker.rejectionTimeout, config.rabbitmq.taskBroker.prefetchCount);
+
+            afterTaskSender = new messageBroker.RabbitMQBroker(config.rabbitmq.afterTaskBroker.URL, config.rabbitmq.afterTaskBroker.queueName, dummyCallback, config.rabbitmq.afterTaskBroker.queueOptions, config.rabbitmq.afterTaskBroker.messageOptions, config.rabbitmq.afterTaskBroker.rejectionTimeout, config.rabbitmq.afterTaskBroker.prefetchCount);
             break;
         }
         case "SQS":
         {
             console.log("Intializing SQS interface");
-            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.queueOptions, config.sqs.messageOptions);
+
+            mbInterface = new messageBroker.SQSBroker(projectTask, config.sqs.taskBroker.queueOptions, config.sqs.taskBroker.messageOptions, config.sqs.taskBroker.prefetchCount, true);
+
+            afterTaskSender = new messageBroker.SQSBroker(dummyCallback, config.sqs.afetrTaskBroker.queueOptions, config.sqs.afetrTaskBroker.messageOptions, 0, false);
             break;
         }
         default:
         {
             console.log("No valid broker detected in config file");
             mbInterface = null;
+            afterTaskSender = null;
             break;
         }
     }
@@ -45,8 +57,11 @@ export async function projectTask(path:string):Promise<void>
     }
 }
 
+async function dummyCallback(path:string):Promise<void>{}
+
 async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
 {
+    let timer = new Timer("taskstore_read");
     let processedPath = processPath(path);
     let getOperation = new GetTaskStore({
         action: myTypes.action.get,
@@ -61,35 +76,37 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
             limit: config.ted.taskStoreBatchSize
         }
     })
+    console.log("reading DB");
     let result = await getOperation.execute();
+    console.log("pending operation : ", result.queryResults);
+
     if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query pending operations on given path : " + path);
+    timer.stop();
     return result.queryResults.allResultsEnc;
 }
 
 async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise<void>
 {
+    let timer = new Timer("projection");
     try
     {
         let opDescriptor:myTypes.InternalOperationDescription = JSON.parse(opLog.object);
-        let tracker = new RequestTracker({
-            action: opDescriptor.action,
-            path: buildPath(opDescriptor.collections, opDescriptor.documents, false),
-        }, "projection");
-        await runWriteOperation(opDescriptor, tracker);
-        tracker.updateLabel("stored_write_operation");
-        tracker.endStep("cassandra_write");
+        await runWriteOperation(opDescriptor);
+        sendToAfterTask(opDescriptor);
         let rmDescriptor = {...opDescriptor};
         rmDescriptor.keyOverride = {
             path: opLog.path,
             op_id: opLog.op_id
         }
         let removeOperation = new RemoveTaskStore(rmDescriptor);
+        let rmTimer = new Timer("taskstore_remove");
         await removeOperation.execute();
-        tracker.endStep("taskstore_remove");
-        tracker.log();
+        rmTimer.stop();
+        timer.stop();
     }
     catch(err)
     {
+        timer.stop();
         if(err === tableCreationError && retry)
         {
             await delay(10000);
@@ -102,21 +119,31 @@ async function runPendingOperation(opLog:myTypes.DBentry, retry:boolean):Promise
 
 export async function forwardCollection(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    let path:string = buildPath(opDescriptor.collections, opDescriptor.documents, true);
-    console.log("collection to forward", path);
-    let operationsToForward:myTypes.DBentry[]
-    do
+    try
     {
-        operationsToForward = await getPendingOperations(path);
-        for(let op of operationsToForward)
+        let timer = new Timer("collection_forwarding");
+        let path:string = buildPath(opDescriptor.collections, opDescriptor.documents, true);
+        console.log("collection to forward", path);
+        let operationsToForward:myTypes.DBentry[]
+        do
         {
-            await runPendingOperation(op, true);
-        }
-    }while(operationsToForward.length == config.ted.taskStoreBatchSize )    
+            operationsToForward = await getPendingOperations(path);
+            for(let op of operationsToForward)
+            {
+                await runPendingOperation(op, true);
+            }
+        }while(operationsToForward.length == config.ted.taskStoreBatchSize )
+        timer.stop();
+    }
+    catch(err)
+    {
+    }
+
 }
 
 async function getAllOperations():Promise<myTypes.DBentry[]>
 {
+    let timer = new Timer("taskstore_read");
     let getOperation = new GetTaskStore({
         action: myTypes.action.get,
         opID: "null",
@@ -129,7 +156,9 @@ async function getAllOperations():Promise<myTypes.DBentry[]>
         keyOverride: {}
     })
     let result = await getOperation.execute();
-    if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined) throw new Error("Unable to query all pending operations");
+    timer.stop();
+    if( result.queryResults === undefined || result.queryResults.allResultsEnc === undefined)
+        return [];
     return result.queryResults.allResultsEnc;
 }
 
@@ -147,4 +176,49 @@ export async function fastForwardTaskStore():Promise<void>
         let path = buildPath(opDescriptor.collections, opDescriptor.documents, true)
         await mbInterface.pushTask(path, opDescriptor.opID);
     }
+}
+
+export async function sendToAfterTask(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+{
+    return new Promise(async (resolve, reject) => 
+    {
+        try{
+            if(opDescriptor.afterTask ==! true) resolve();
+            else
+            {
+                let getOp = new GetMainView({
+                    action: myTypes.action.get,
+                    opID: opDescriptor.opID,
+                    collections: opDescriptor.collections,
+                    documents: opDescriptor.documents
+                });
+                let res = await getOp.execute()
+                myCrypto.decryptResult(res, myCrypto.globalKey);
+                if(res.queryResults !== undefined && res.queryResults?.resultCount > 0)
+                {
+                    if(res.queryResults?.allResultsClear === undefined) throw new Error("Unable to find the created object");
+                    let ans:myTypes.AfterTask = {
+                        action:opDescriptor.action,
+                        path:buildPath(opDescriptor.collections, opDescriptor.documents, false),
+                        object:res.queryResults.allResultsClear[0].object as myTypes.ServerSideObject,
+                    };
+                    await afterTaskSender?.pushTask(JSON.stringify(ans), opDescriptor.opID);
+                    resolve();
+                }
+                else
+                {
+                    let ans:myTypes.AfterTask = {
+                        action:opDescriptor.action,
+                        path:buildPath(opDescriptor.collections, opDescriptor.documents, false),
+                        object:{},
+                    };
+                    await afterTaskSender?.pushTask(JSON.stringify(ans), opDescriptor.opID);
+                    resolve();
+                }
+            }
+        }
+        catch(err){
+            reject(err);
+        }        
+    });
 }

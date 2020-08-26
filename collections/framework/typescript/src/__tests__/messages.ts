@@ -1,38 +1,24 @@
 import express from "express";
 import TED, { HttpError } from "../index";
+import { delay } from "../TED/TedServer";
+
+let ted = new TED();
 
 // First connect to TED and set options
-TED.connect({
-  options1: "",
-  options2: "",
-  credentials: {
-    user: "",
-    password: ""
-  }
+ted.server.connect({
+  username: "",
+  password: "ceci est un mot de passe"
 });
+
 
 //We suppose we are in an existing application,
 //so TED must be triggered with specific routes
 const app = express();
-app.all("/api/collections/*", async function(
-  req: express.Request,
-  res: express.Response
-) {
-  let collectionPath = req.method.replace("/api/collections/", "");
+app.use(express.json());
+ted.bind(app, "/api/collections");
 
-  //TED request should be as generic as possible
-  // to be compatible with other Apis than express
-  const response: any = await TED.request({
-    path: collectionPath,
-    body: req.body,
-    originalRequest: req
-  });
 
-  //TODO add json response type
-  res.send(response);
-});
-
-TED.beforeSave(
+ted.before.save(
   "companies/channels/messages",
   (object: any, originalRequest: express.Request) => {
     object.date = new Date().getTime();
@@ -49,18 +35,29 @@ TED.beforeSave(
   }
 );
 
-TED.afterSave(
-  "companies/channels/messages",
-  (objectBefore: any, objectAfter: any) => {
-    if (objectBefore === null) {
-      let channel = await TED.document("companies/channels", [
-        "company-3",
-        "channel-12"
-      ]);
-      channel.update({
-        total_messages: total_messages + 1
-      });
-      await channel.save();
-    }
+app.listen(9000);
+
+console.log("running");
+
+ted.schemas.add("company",{
+  fullsearchIndex:{
+    default:false
+  },
+  dbSearchIndex:{
+    default:false,
+    content:true,
+    auteur:true,
+    pouet:true,
+    null:true,
+    piege:false
+  },
+  wsPrivateKeys:{
+    default:false
   }
-);
+});
+
+ted.after.save("company", async (object:Object) => { console.log("Aftersave : ", object);await delay(10000); console.log("end"); });
+ted.after.remove("company", async (object:Object) => { console.log("Afterremove : ", object);await delay(10000); console.log("end"); });
+ted.after.get("company", async (object:Object) => { console.log("Afterget : ", object);await delay(10000); console.log("end"); });
+
+ted.afterTasks(3);

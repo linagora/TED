@@ -1,5 +1,5 @@
 import * as myTypes from "../../services/utils/myTypes";
-import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { createTable } from "../../services/database/operations/baseOperations";
 import { SaveOperation, tableCreationError } from "../../services/database/operations/baseOperations";
 
 export class SaveEventStore extends SaveOperation
@@ -23,11 +23,12 @@ export class SaveEventStore extends SaveOperation
     return await super.execute()
     .catch(async (err:myTypes.CQLResponseError) =>
     {
-      if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+      if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
       {
         await this.createTable();
         throw tableCreationError;
-      }
+      } 
+      console.log(err.message);
       return {status:"error", error:err};
     });
   }
