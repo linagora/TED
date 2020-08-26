@@ -1,180 +1,191 @@
-import cassandra, { types } from "cassandra-driver";
+import * as cassandra from "cassandra-driver";
 import { readFileSync } from "fs";
 import * as myTypes from "../../../utils/myTypes";
 import { v4 as uuidv4 } from "uuid";
-import * as config from "../../../../../config/config";
+import config from "../../../../services/configuration/configuration";
 
-let cassandraOptions:cassandra.DseClientOptions;
-let defaultQueryOptions:cassandra.QueryOptions;
-export let client:cassandra.Client;
- 
-export async function setup():Promise<void>
-{
-  switch(config.ted.dbCore)
-  {
-    case "keyspace":
-    {
-      const auth = new cassandra.auth.PlainTextAuthProvider(config.keyspace.keyspaceID, config.keyspace.keyspaceKey);
+let cassandraOptions: cassandra.DseClientOptions;
+let defaultQueryOptions: cassandra.QueryOptions;
+export let client: cassandra.Client;
+
+export async function setup(): Promise<void> {
+  switch (config.configuration.ted.dbCore) {
+    case "keyspace": {
+      const auth = new cassandra.auth.PlainTextAuthProvider(
+        config.configuration.cassandra.keyspaceID,
+        config.configuration.cassandra.keyspaceKey
+      );
       const sslOptions = {
-        ca: [readFileSync("src/config/AmazonRootCA1.pem", 'utf-8')],
-        host: config.keyspace.contactPoint[0],
-        rejectUnauthorized: true
+        ca: [readFileSync("src/config/AmazonRootCA1.pem", "utf-8")],
+        host: config.configuration.cassandra.contactPoint[0],
+        rejectUnauthorized: true,
       };
       cassandraOptions = {
-        contactPoints: config.keyspace.contactPoint,
-        localDataCenter: config.keyspace.localDatacenter,
-        keyspace: config.keyspace.keyspace,
+        contactPoints: config.configuration.cassandra.contactPoint,
+        localDataCenter: config.configuration.cassandra.localDatacenter,
+        keyspace: config.configuration.cassandra.keyspace,
         policies: {
-          retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
+          retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(
+            new cassandra.policies.retry.RetryPolicy()
+          ),
         },
         queryOptions: {
-          isIdempotent: true
+          isIdempotent: true,
         },
         authProvider: auth,
         sslOptions: sslOptions,
-        protocolOptions: {port: 9142}
+        protocolOptions: { port: 9142 },
       };
       defaultQueryOptions = {
         prepare: true,
-        consistency: types.consistencies.localQuorum
+        consistency: cassandra.types.consistencies.localQuorum,
       };
       break;
     }
     case "scylladb":
-    case "cassandra":
-    {
+    case "cassandra": {
       cassandraOptions = {
-        contactPoints: config.cassandra.contactPoint,
-        localDataCenter: config.cassandra.localDatacenter,
-        keyspace: config.cassandra.keyspace,
+        contactPoints: config.configuration.cassandra.contactPoint,
+        localDataCenter: config.configuration.cassandra.localDatacenter,
+        keyspace: config.configuration.cassandra.keyspace,
         policies: {
-          retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
+          retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(
+            new cassandra.policies.retry.RetryPolicy()
+          ),
         },
         queryOptions: {
-          isIdempotent: true
-        }
+          isIdempotent: true,
+        },
       };
       defaultQueryOptions = {
         prepare: true,
       };
       break;
     }
-    default:
-    {
+    default: {
       throw new Error("Unsupported DB core");
     }
   }
   client = new cassandra.Client(cassandraOptions);
-  await client.connect()
-  .catch( async (err:myTypes.CQLResponseError) => 
-  {
-      if( err.code === 8704 && err.message.match("^Keyspace \'.*\' does not exist$"))
-      {
+  await client
+    .connect()
+    .catch(async (err: myTypes.CQLResponseError) => {
+      if (
+        err.code === 8704 &&
+        err.message.match("^Keyspace '.*' does not exist$")
+      ) {
         console.error(err);
         console.log("trying to create keyspace");
-        return await createKeyspace(config.cassandra.keyspace, config.cassandra.defaultCassandraKeyspaceOptions as myTypes.KeyspaceReplicationOptions);
+        return await createKeyspace(
+          config.configuration.cassandra.keyspace,
+          config.configuration.cassandra
+            .defaultCassandraKeyspaceOptions as myTypes.KeyspaceReplicationOptions
+        );
       }
-  })
-  .then( () => client.connect());
+    })
+    .then(() => client.connect());
 }
 
-export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
-{
-  let queryID = uuidv4()
-  console.log("Begin query "+ queryID + ",\n   " + JSON.stringify(query) );
-  try
-  {
-    let rs:any;
-    if(options === undefined) options = defaultQueryOptions;
+export async function runDB(
+  query: myTypes.Query,
+  options?: myTypes.QueryOptions
+): Promise<myTypes.ServerAnswer> {
+  let queryID = uuidv4();
+  console.log("Begin query " + queryID + ",\n   " + JSON.stringify(query));
+  try {
+    let rs: any;
+    if (options === undefined) options = defaultQueryOptions;
     rs = await client.execute(query.query, query.params, options);
     console.log("   End query ", queryID);
     return processResult(rs);
-  }
-  catch(err)
-  {
+  } catch (err) {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
-};
+}
 
-export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
-{
-  let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
-  let queryID = uuidv4()
-  console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
-  try
-  {
-    if(options === undefined) options = defaultQueryOptions;
-    let promises:Promise<unknown>[] = [];
-    for(let query of queries)
-    {
+export async function runMultiOpDB(
+  queries: myTypes.Query[],
+  options?: myTypes.QueryOptions
+): Promise<myTypes.ServerAnswer> {
+  let queryStr: string[] = queries.map((value: myTypes.Query) =>
+    JSON.stringify(value)
+  );
+  let queryID = uuidv4();
+  console.log("Begin query " + queryID + ",\n  ", queryStr.join(";\n   "));
+  try {
+    if (options === undefined) options = defaultQueryOptions;
+    let promises: Promise<unknown>[] = [];
+    for (let query of queries) {
       promises.push(client.execute(query.query, query.params, options));
     }
     await Promise.all(promises);
     console.log("   End query ", queryID);
-    return {status: "success"};
-  }
-  catch(err)
-  {
+    return { status: "success" };
+  } catch (err) {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
 }
 
-export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
-{
-  let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
-  let queryID = uuidv4()
-  console.log("Begin query "+ queryID + ",\n  ", queryStr.join(";\n   ") );
-  try
-  {
-    if(options === undefined) options = defaultQueryOptions;
+export async function runBatchDB(
+  queries: myTypes.Query[],
+  options?: myTypes.QueryOptions
+): Promise<myTypes.ServerAnswer> {
+  let queryStr: string[] = queries.map((value: myTypes.Query) =>
+    JSON.stringify(value)
+  );
+  let queryID = uuidv4();
+  console.log("Begin query " + queryID + ",\n  ", queryStr.join(";\n   "));
+  try {
+    if (options === undefined) options = defaultQueryOptions;
     await client.batch(queries, options);
     console.log("   End query ", queryID);
-    return {status: "success"};
-  }
-  catch(err)
-  {
+    return { status: "success" };
+  } catch (err) {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
 }
 
-function processResult(rs:any):myTypes.ServerAnswer
-{
+function processResult(rs: any): myTypes.ServerAnswer {
   const ans = rs.first();
-  if(ans == null)
-  {
-    return {status: "success", queryResults:{resultCount:0, allResultsEnc:[], allResultsClear:[]}};
+  if (ans == null) {
+    return {
+      status: "success",
+      queryResults: { resultCount: 0, allResultsEnc: [], allResultsClear: [] },
+    };
   }
-  let queryResults:myTypes.QueryResult = {resultCount:rs.rowLength};
+  let queryResults: myTypes.QueryResult = { resultCount: rs.rowLength };
   queryResults.allResultsEnc = [];
   queryResults.allResultsClear = [];
-  for(let i:number = 0; i<queryResults.resultCount; i++)
-  {
-    let object = JSON.parse(rs.rows[i]['[json]']);
-    try
-    {
+  for (let i: number = 0; i < queryResults.resultCount; i++) {
+    let object = JSON.parse(rs.rows[i]["[json]"]);
+    try {
       JSON.parse(object["object"]);
       queryResults.allResultsEnc.push(object);
-    }
-    catch
-    {
+    } catch {
       queryResults.allResultsClear.push(object);
     }
   }
-  return {status: "success", queryResults:queryResults};
+  return { status: "success", queryResults: queryResults };
 }
 
-export async function createKeyspace(keyspaceName:string, options:myTypes.KeyspaceReplicationOptions):Promise<void>
-{
+export async function createKeyspace(
+  keyspaceName: string,
+  options: myTypes.KeyspaceReplicationOptions
+): Promise<void> {
   let nameCtrl = keyspaceName.match(/^[a-zA-Z\_]*$/);
-  if(nameCtrl === null) throw new Error("Invalid keyspace name");
-  let res = "CREATE KEYSPACE " + keyspaceName + " WITH replication = " + JSON.stringify(options);
+  if (nameCtrl === null) throw new Error("Invalid keyspace name");
+  let res =
+    "CREATE KEYSPACE " +
+    keyspaceName +
+    " WITH replication = " +
+    JSON.stringify(options);
   res = res.split('"').join("'");
-  let optionsTemp = {...cassandraOptions};
+  let optionsTemp = { ...cassandraOptions };
   delete optionsTemp.keyspace;
   let clientTemp = new cassandra.Client(optionsTemp);
   await clientTemp.execute(res);
   console.log("keyspace created");
-};
+}

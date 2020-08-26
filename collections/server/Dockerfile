@@ -1,0 +1,17 @@
+FROM node:12
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN npm install
+COPY . .
+yarn build
+
+# App
+EXPOSE 8080
+
+# Monitoring (Prometheus)
+EXPOSE 8081
+
+ENTRYPOINT ["./entrypoint.sh"]
+
