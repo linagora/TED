@@ -18,9 +18,9 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
         if(opDescriptor.secondaryInfos === undefined) return new GetMainView(opDescriptor);
 
         let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
+        timer.stop();
         if(matchingIDs.length === 0) throw EmptyResultError;
         let op = buildGetOperation(opDescriptor, matchingIDs);
-        timer.stop();
         return op;
     }
     catch(err)

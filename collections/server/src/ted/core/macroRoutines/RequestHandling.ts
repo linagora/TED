@@ -82,10 +82,10 @@ export default async function handleRequest(request:myTypes.ServerRequestBody, p
             {
                 let totalResponseTime = new Timer("write_request");
                 await logEvent(opDescriptor);
+                totalResponseTime.stop();
                 let timer = new Timer("mb_write");
                 if(mbInterface !== null) await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
                 timer.stop();
-                totalResponseTime.stop();
                 return {status: "Success"};
             }
             case myTypes.action.get:
