@@ -1,7 +1,7 @@
 import * as myTypes from "../../../utils/myTypes";
 import * as datastaxTools from "./DatastaxTools";
 import { globalCounter } from "../../../../index";
-import { Timer, RequestTracker } from "../../../monitoring/Timer";
+import { Timer } from "../../../monitoring/Timer";
 
 export type CQLOperation = CQLBaseOperation | CQLBatchOperation | CQLOperationArray;
 
@@ -15,7 +15,7 @@ export abstract class CQLBaseOperation implements myTypes.DBDirectOperation
   constructor(infos:myTypes.CQLOperationInfos)
   {
     this.action = infos.action;
-    this.table = infos.table;
+    this.table = "cassandra_collections." + infos.table;
     this.entry = infos.keys;
     this.query = null;
   }
@@ -141,7 +141,7 @@ export class CQLGetOperation extends CQLBaseOperation
     {
       if(primaryKey.params.length > 0) res.push("AND");
       else res.push("WHERE");
-      res.push(this.where.field);
+      res.push(this.where.key);
       res.push(this.where.operator);
       res.push("?");
       params.push(this.where.value);
@@ -214,7 +214,10 @@ export class CQLBatchOperation implements myTypes.DBDirectOperation
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
+    globalCounter.inc("cql_batch_isolated");
+    let timer = new Timer("cql_batch_isolated");
     let res = await datastaxTools.runBatchDB(this.queries);
+    timer.stop();
     return res;
   }
 
@@ -256,7 +259,10 @@ export class CQLOperationArray implements myTypes.DBDirectOperation
   {
     this.buildQueries();
     if(this.queries === null) throw new Error("Error in batch, invalid query");
+    globalCounter.inc("cql_batch_unisolated");
+    let timer = new Timer("cql_batch_unisolated");
     let res = await datastaxTools.runMultiOpDB(this.queries);
+    timer.stop
     return res;
   }
 

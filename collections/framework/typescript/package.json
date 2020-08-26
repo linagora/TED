@@ -7,13 +7,21 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon --watch false",
     "start:dev": "nodemon",
-    "start:tests": "nodemon --exec ts-node ./src/__tests__/index.spec.ts"
+    "start:tests": "nodemon --exec ts-node ./src/__tests__/messages.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devDependencies": {},
+  "devDependencies": {
+    "@types/node": "^14.0.13",
+    "nodemon": "^2.0.4",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.5"
+  },
   "dependencies": {
-    "express": "^4.17.1"
+    "@types/express": "^4.17.7",
+    "@types/socket.io-client": "^1.4.33",
+    "express": "^4.17.1",
+    "socket.io-client": "^2.3.0"
   }
 }

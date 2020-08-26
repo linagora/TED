@@ -46,9 +46,21 @@ export type Order = {
   order:"ASC" | "DESC"
 };
 
-export type ServerBaseRequest = {
-  action: action;
+export type ServerRequest = {
   path:string;
+  body:ServerRequestBody;
+}
+
+export type TEDSchema =
+{
+    fullsearchIndex:string[];
+    wsPrivateKeys:string[];
+    dbSearchIndex:string[];
+}
+
+export type ServerRequestBody = {
+  action: action;
+  schema?:TEDSchema;
   object?:ServerSideObject;
   options?:SaveOptions | GetOptions;
   order?:Order;
@@ -62,6 +74,7 @@ export type InternalOperationDescription = {
   collections:string[];
   documents:string[];
   opID:string;
+  schema?:TEDSchema;
   clearObject?:ServerSideObject;
   encObject?:string;
   operations?:InternalOperationDescription[];
@@ -69,6 +82,7 @@ export type InternalOperationDescription = {
   tableOptions?:TableOptions;
   secondaryInfos?:SecondaryInfos;
   keyOverride?:DBentry;
+  afterTask?:boolean;
 };
 
 export type ServerAnswer = {
@@ -104,7 +118,7 @@ export type ServerSideObject = {
 };
 
 export type DBentry = {
-  [key:string]:string; //key=collections, values = documents
+  [key:string]:any; //key=collections, values = documents
 };
 
 export type EncObject = {
@@ -160,7 +174,7 @@ export type SecondaryInfos = {
 
 export type WhereClause = {
   operator:Operator;
-  field:string;
+  key:string;
   value:any;
 }
 
@@ -169,4 +183,16 @@ export type CQLOperationInfos = {
   keys:DBentry,
   table:string,
   options?:SaveOptions | GetOptions,
+}
+
+export type AfterSaveInfos = {
+  senderID:string,
+  originalRequest:string,
+}
+
+export type AfterTask =
+{
+    action:action;
+    path:string;
+    object:Object;
 }

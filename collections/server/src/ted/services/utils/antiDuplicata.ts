@@ -1,5 +1,3 @@
-import { ted } from "../../../config/config";
-
 type StateTable = {
     [key:string]:Boolean
 }
@@ -24,15 +22,16 @@ export class TaskTable
     resolver:ResolverTable;
     taskCounter:number;
     lock:ExternalResolver[];
-    
+    maxConcurrentTasks:number;
 
-    constructor()
+    constructor(maxConcurrentTasks:number)
     {
         this.taskState = {};
         this.resolver = {};
         this.promiseTable = {};
         this.taskCounter = 0;
         this.lock = [];
+        this.maxConcurrentTasks = maxConcurrentTasks;
     }
 
     public isDone(task:string):boolean
@@ -93,7 +92,7 @@ export class TaskTable
 
     private async delayer():Promise<void>
     {
-        if(this.taskCounter < ted.maxTableCreation) return;
+        if(this.taskCounter < this.maxConcurrentTasks) return;
         let promiseExt:ExternalResolver = {res: ()=>{}, rej: ()=>{}};
         let lockPromise = new Promise(function (resolve, reject):void
         {

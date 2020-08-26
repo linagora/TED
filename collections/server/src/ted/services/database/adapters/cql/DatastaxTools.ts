@@ -3,28 +3,27 @@ import { readFileSync } from "fs";
 import * as myTypes from "../../../utils/myTypes";
 import { v4 as uuidv4 } from "uuid";
 import * as config from "../../../../../config/config";
-import { globalCounter } from "../../../../index";
-import { Timer, RequestTracker } from "../../../monitoring/Timer";
 
 let cassandraOptions:cassandra.DseClientOptions;
+let defaultQueryOptions:cassandra.QueryOptions;
 export let client:cassandra.Client;
  
 export async function setup():Promise<void>
 {
-  switch(config.cassandra.core)
+  switch(config.ted.dbCore)
   {
     case "keyspace":
     {
-      const auth = new cassandra.auth.PlainTextAuthProvider(config.cassandra.keyspaceID, config.cassandra.keyspaceKey);
+      const auth = new cassandra.auth.PlainTextAuthProvider(config.keyspace.keyspaceID, config.keyspace.keyspaceKey);
       const sslOptions = {
         ca: [readFileSync("src/config/AmazonRootCA1.pem", 'utf-8')],
-        host: config.cassandra.contactPoint[0],
+        host: config.keyspace.contactPoint[0],
         rejectUnauthorized: true
       };
       cassandraOptions = {
-        contactPoints: config.cassandra.contactPoint,
-        localDataCenter: config.cassandra.localDatacenter,
-        keyspace: config.cassandra.keyspace,
+        contactPoints: config.keyspace.contactPoint,
+        localDataCenter: config.keyspace.localDatacenter,
+        keyspace: config.keyspace.keyspace,
         policies: {
           retry: new cassandra.policies.retry.IdempotenceAwareRetryPolicy(new cassandra.policies.retry.RetryPolicy())  
         },
@@ -34,6 +33,10 @@ export async function setup():Promise<void>
         authProvider: auth,
         sslOptions: sslOptions,
         protocolOptions: {port: 9142}
+      };
+      defaultQueryOptions = {
+        prepare: true,
+        consistency: types.consistencies.localQuorum
       };
       break;
     }
@@ -50,6 +53,9 @@ export async function setup():Promise<void>
         queryOptions: {
           isIdempotent: true
         }
+      };
+      defaultQueryOptions = {
+        prepare: true,
       };
       break;
     }
@@ -72,17 +78,8 @@ export async function setup():Promise<void>
   .then( () => client.connect());
 }
 
-
-
-const defaultQueryOptions:cassandra.QueryOptions = {
-  prepare: true,
-  //consistency: types.consistencies.localQuorum
-}
-
 export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
-  globalCounter.inc("single_cql_request");
-  let timer = new Timer("single_cql_request");
   let queryID = uuidv4()
   console.log("Begin query "+ queryID + ",\n   " + JSON.stringify(query) );
   try
@@ -91,18 +88,16 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
     if(options === undefined) options = defaultQueryOptions;
     rs = await client.execute(query.query, query.params, options);
     console.log("   End query ", queryID);
-    timer.stop();
     return processResult(rs);
   }
   catch(err)
   {
     console.log("   Error thrown by query ", queryID, "  :  ", err.message);
-    timer.stop();
     throw err;
   }
 };
 
-export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()
@@ -126,7 +121,7 @@ export async function runMultiOpDB(queries:myTypes.Query[], options?:myTypes.Que
   }
 }
 
-export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions, tracker?:RequestTracker):Promise<myTypes.ServerAnswer>
+export async function runBatchDB(queries:myTypes.Query[], options?:myTypes.QueryOptions):Promise<myTypes.ServerAnswer>
 {
   let queryStr:string[] = queries.map( (value:myTypes.Query) => JSON.stringify(value))
   let queryID = uuidv4()

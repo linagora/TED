@@ -1,18 +1,22 @@
-import * as http from "http";
+import https from "https";
+import http from "http";
+import fs from "fs";
 import handleRequest from "./core/macroRoutines/RequestHandling";
 import * as myTypes from "./services/utils/myTypes";
 import { mbInterface, fastForwardTaskStore, setup as mbSetup } from "./core/macroRoutines/StoredTaskHandling";
 import { setup as cryptoSetup } from "./services/utils/cryptographicTools";
 import { setup as cassandraSetup, client as cassandraClient} from "./services/database/adapters/cql/DatastaxTools";
-import { TimerLogsMap, Timer, RequestTracker, RequestTrackerLog } from "./services/monitoring/Timer";
+import { TimerLogsMap, Timer } from "./services/monitoring/Timer";
 import { CounterMap } from "./services/monitoring/Counter";
 import { setup as promSetup } from "./services/monitoring/PrometheusClient";
+import { setup as mongoSetup } from "./services/database/adapters/sql/MongoDBtools";
 import * as config from "../config/config";
 import * as promClient from "prom-client";
 
+import { setup as setupSocketcluster } from "./services/socket/sockectServer";
+
 export let globalTimerLogs:TimerLogsMap;
 export let globalCounter:CounterMap;
-export let globalTrackerLogs:RequestTrackerLog;
 
 async function setup():Promise<void>
 {
@@ -21,18 +25,19 @@ async function setup():Promise<void>
     let Sentry = require("@sentry/node");
     Sentry.init({dsn: config.sentry.DSN});
   }
-  globalTrackerLogs = new RequestTrackerLog();
-  RequestTracker.logMap = globalTrackerLogs;
   globalTimerLogs = new TimerLogsMap();
   Timer.logMap = globalTimerLogs;
   globalCounter = new CounterMap();
   mbSetup();
   cryptoSetup();
   promSetup();
-  await cassandraSetup();
+  if(["cassandra", "scylladb", "keyspace"].includes(config.ted.dbCore))
+    await cassandraSetup();
+  else if(["mongodb"].includes(config.ted.dbCore))
+    await mongoSetup();
 }
 
-async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerBaseRequest>
+async function getHTTPBody(req:http.IncomingMessage):Promise<myTypes.ServerRequest>
 {
   return new Promise((resolve, reject) => 
   {
@@ -67,30 +72,40 @@ async function main():Promise<void>
   .catch( (err:myTypes.CQLResponseError) =>
   {
     console.error(err);
-    if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+    if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
     {
       console.log("TaskStore doesn't exist, nothing to fast forward.");
+      console.log(err.message.match(/^Collection ([a-zA-z_]*) does not exist./));
       return;
     }
+    console.log("oups")
     throw err;
   });
 
-  console.log("Initializing http server");
-  http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
+  console.log("Initializing https server");
+  let metricServer = http.createServer(async function(req: http.IncomingMessage, res: http.OutgoingMessage)
+  {
+    if(req.url === "/metrics")
+    {
+      res.end(promClient.register.metrics());
+      return;
+    }
+  });
+  metricServer.listen(8081);
+
+  let httpServer = https.createServer({
+    key: fs.readFileSync("src/config/ssl/key.pem"),
+    cert: fs.readFileSync("src/config/ssl/cert.pem"),
+    requestCert: false,
+    rejectUnauthorized: false}, async function(req: http.IncomingMessage, res: http.OutgoingMessage)
   {
     try{
-      if(req.url === "/metrics")
-      {
-        res.end(promClient.register.metrics());
-        return;
-      }
       console.log("\n\n ===== New Incoming Request =====");
       let httpTimer = new Timer("http_response");
-      let operation:myTypes.ServerBaseRequest = await getHTTPBody(req);
-      let tracker = new RequestTracker(operation, "");
+      let operation:myTypes.ServerRequest = await getHTTPBody(req);
       try
       {
-        let answer = await handleRequest(operation, tracker);
+        let answer = await handleRequest(operation.body, operation.path, undefined);
         res.write(JSON.stringify(answer));
         res.end();
       }
@@ -105,7 +120,9 @@ async function main():Promise<void>
     catch(err){
       console.error(err);
     }
-  }).listen(8080);
+  });
+  setupSocketcluster(httpServer);
+  httpServer.listen(8080);
   initTimer.stop();
 }
 main();

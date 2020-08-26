@@ -1,5 +1,4 @@
 import { writeFile, readFile } from "fs"
-import { ServerBaseRequest } from "../utils/myTypes";
 import * as prometheus from "prom-client";
 
 type LogMap = {
@@ -132,15 +131,13 @@ export class RequestTracker
 {
     logs:TimeTracker;
     label:string;
-    operation:ServerBaseRequest;
     last:number;
     static logMap:RequestTrackerLog;
 
-    constructor(operation:ServerBaseRequest, label:string)
+    constructor( label:string)
     {
         this.logs = {};
         this.last = new Date().getTime();
-        this.operation = operation;
         this.label = label;
     }
 

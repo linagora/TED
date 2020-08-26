@@ -1,6 +1,6 @@
 import * as myTypes from "../../services/utils/myTypes";
 import { createHash } from "crypto";
-import { createTable } from "../../services/database/adapters/cql/TableCreation";
+import { createTable } from "../../services/database/operations/baseOperations";
 import { SaveOperation, GetOperation, tableCreationError, RemoveOperation } from "../../services/database/operations/baseOperations";
 
 export let TStoCQLtypes:Map<string, string>= new Map();
@@ -28,11 +28,12 @@ export class SaveSecondaryView extends SaveOperation
         return super.execute()
         .catch(async (err:myTypes.CQLResponseError) =>
         {
-            if(err.code === 8704 && err.message.substr(0,18) === "unconfigured table")
+            if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
             {
                 await this.createTable();
                 throw tableCreationError;
             }
+            console.error(err);
             return {status:"error", error:err};
         });
     }
@@ -184,7 +185,7 @@ export function getGetSecondaryView(operation:myTypes.InternalOperationDescripti
         opID: operation.opID,
         collections: operation.collections,
         documents: operation.documents,
-        secondaryInfos: operation.secondaryInfos !== undefined ? operation.secondaryInfos : where,
+        secondaryInfos: where === undefined ? hashSecondaryInfos(operation.secondaryInfos as myTypes.SecondaryInfos) : hashSecondaryInfos(where),
     });
     return op;
 }
@@ -197,7 +198,7 @@ export function getRemoveSecondaryView(operation:myTypes.InternalOperationDescri
         opID: operation.opID,
         collections : operation.collections,
         documents: operation.documents,
-        secondaryInfos: where === undefined ? operation.secondaryInfos : where,
+        secondaryInfos: where === undefined ? hashSecondaryInfos(operation.secondaryInfos as myTypes.SecondaryInfos) : hashSecondaryInfos(where),
     });
     return op;
 }
@@ -219,6 +220,40 @@ export function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryK
         secondaryKey: secondaryKey,
         secondaryValue: object[secondaryKey],
         operator: operator
+    }
+}
+
+export function hashSecondaryInfos(object:myTypes.WhereClause | myTypes.SecondaryInfos):myTypes.SecondaryInfos
+{
+    if(Object.keys(object).includes("key"))
+    {
+        let where = object as myTypes.WhereClause;
+        if(typeof(where.value) === "string")
+        {
+            return {
+                secondaryKey:where.key,
+                secondaryValue: createHash("sha256").update(where.value as string).digest('base64'),
+                operator: where.operator
+            }
+        }
+        return {
+            secondaryKey: where.key,
+            secondaryValue: where.value,
+            operator: where.operator
+        }
+    }
+    else
+    {
+        let secondary = object as myTypes.SecondaryInfos;
+        if(typeof(secondary.secondaryValue) === "string")
+        {
+            return {
+                secondaryKey : secondary.secondaryKey,
+                secondaryValue : createHash("sha256").update(secondary.secondaryValue as string).digest('base64'),
+                operator : secondary.operator
+            }
+        }
+        return secondary;
     }
 }
 

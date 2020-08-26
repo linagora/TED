@@ -1,25 +1,23 @@
 import * as myTypes from "../../services/utils/myTypes";
 import { forwardCollection } from "./StoredTaskHandling";
 import { globalCounter } from "../../index";
-import { Timer, RequestTracker } from "../../services/monitoring/Timer";
+import { Timer } from "../../services/monitoring/Timer";
 import { GetMainView } from "../tedOperations/MainProjections";
 import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
 
 export let EmptyResultError = new Error("No matching object found");
 
-export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription, tracker?:RequestTracker):Promise<GetMainView>
+export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView>
 {
     globalCounter.inc("get_precompute");
     let timer = new Timer("get_precompute");
     await forwardCollection(opDescriptor);
-    tracker?.endStep("collection_update");
     if(opDescriptor.collections.length ===  opDescriptor.documents.length) return new GetMainView(opDescriptor);
     try
     {
         if(opDescriptor.secondaryInfos === undefined) return new GetMainView(opDescriptor);
 
         let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
-        tracker?.endStep("secondary_table_read");
         if(matchingIDs.length === 0) throw EmptyResultError;
         let op = buildGetOperation(opDescriptor, matchingIDs);
         timer.stop();
@@ -29,6 +27,7 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     {
         if(err === EmptyResultError) throw err;
         console.log(err);
+        timer.stop();
         return new GetMainView(opDescriptor);
     }
 }
@@ -57,7 +56,7 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
         collections: opDescriptor.collections,
         options: {
             where:{
-                field: opDescriptor.collections.slice(-1)[0],
+                key: opDescriptor.collections.slice(-1)[0],
                 value: matchingIDs,
                 operator: myTypes.Operator.in
             }

@@ -9,7 +9,7 @@ async function delay(ms:number):Promise<void>
 
 
 //writeReadDelRead();
-writeFusion();
+//writeFusion();
 //getObject("b/2704dcd3-1f82-43e3-9da5-f539fd2e2110/aa/f61ed9ab-3cbd-4c98-ba86-6d369d610094/aaa/5f6d16e8-59bd-4388-9005-bc39cd52ee3f").then( (res) => console.log(res));
 
 async function writeAndRead():Promise<void>
@@ -18,7 +18,7 @@ async function writeAndRead():Promise<void>
     let saveOps:Promise<void>[] = [];
     for (let i:number = 0; i<500; i++)
     {
-        await delay(10);
+        await delay(1000);
         saveOps.push(saveObject(randomObject()));
         //await saveObject(randomObject());
     }
@@ -39,7 +39,9 @@ async function writeAndRead():Promise<void>
     for(let i:number = 0; i<allObj.length ; i++)
     {
         try{
+            let start = new Date().getTime();
             let dbversion = await getObject(allKeys[i]);
+            console.log(new Date().getTime() - start);
             console.log(dbversion);
             bool = bool && deepEqual(dbversion, allObj[i]);
         }
@@ -53,5 +55,5 @@ async function writeAndRead():Promise<void>
     }
     console.log("Success : ", bool);
 }
-//  writeAndRead();
+writeAndRead();
 
