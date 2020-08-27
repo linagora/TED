@@ -2,6 +2,8 @@
 
 <p align="center">
   <img width="240" height="240" src="ted.png">
+  <br/>
+  <i>This is Ted.</i> <b>Hello Ted! 👋</b>
 </p>
 <br/>
 
