@@ -1,6 +1,9 @@
 # TED - The Extraordinary Database
 
-![This is Ted](ted.png)
+<p align="center">
+  <img width="240" height="240" src="ted.png">
+</p>
+<br/>
 
 TED is a replicated, encrypted, scalable and realtime collections based database used in Twake. It works on top of Cassandra, Elastic-Search and RabbitMQ.
 
