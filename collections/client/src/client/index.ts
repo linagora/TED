@@ -13,8 +13,8 @@ export class TedClient {
   configuration: DBOptions = {
     env: "prod",
     server: {
-      http: "http://localhost:8080/",
-      socket: "ws://localhost:8081/",
+      http: "http://localhost:7250/",
+      socket: "ws://localhost:7251/",
     },
   };
 

@@ -4,8 +4,8 @@ const sleep = (m: any) => new Promise((r) => setTimeout(r, m));
 ted.configure({
   env: "dev",
   server: {
-    http: "http://localhost:8080/",
-    socket: "ws://localhost:8080/",
+    http: "http://localhost:7250/",
+    socket: "ws://localhost:7250/",
   },
 });
 

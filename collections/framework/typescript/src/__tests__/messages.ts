@@ -6,7 +6,7 @@ let ted = new TED();
 
 // First connect to TED and set options
 ted.server.connect({
-  url: "http://localhost:8080",
+  url: "http://localhost:7250",
   username: "",
   password: "ceci est un mot de passe",
 });
