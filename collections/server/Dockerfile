@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install
 COPY . .
-yarn build
+RUN npm run build
 
 # App
 EXPOSE 8080
@@ -13,5 +13,5 @@ EXPOSE 8080
 # Monitoring (Prometheus)
 EXPOSE 8081
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["npm", "run", "start"]
 

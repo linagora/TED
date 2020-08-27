@@ -6,17 +6,16 @@ let ted = new TED();
 
 // First connect to TED and set options
 ted.server.connect({
+  url: "http://localhost:8080",
   username: "",
-  password: "ceci est un mot de passe"
+  password: "ceci est un mot de passe",
 });
-
 
 //We suppose we are in an existing application,
 //so TED must be triggered with specific routes
 const app = express();
 app.use(express.json());
 ted.bind(app, "/api/collections");
-
 
 ted.before.save(
   "companies/channels/messages",
@@ -39,25 +38,37 @@ app.listen(9000);
 
 console.log("running");
 
-ted.schemas.add("company",{
-  fullsearchIndex:{
-    default:false
+ted.schemas.add("company", {
+  fullsearchIndex: {
+    default: false,
   },
-  dbSearchIndex:{
-    default:false,
-    content:true,
-    auteur:true,
-    pouet:true,
-    null:true,
-    piege:false
+  dbSearchIndex: {
+    default: false,
+    content: true,
+    auteur: true,
+    pouet: true,
+    null: true,
+    piege: false,
   },
-  wsPrivateKeys:{
-    default:false
-  }
+  wsPrivateKeys: {
+    default: false,
+  },
 });
 
-ted.after.save("company", async (object:Object) => { console.log("Aftersave : ", object);await delay(10000); console.log("end"); });
-ted.after.remove("company", async (object:Object) => { console.log("Afterremove : ", object);await delay(10000); console.log("end"); });
-ted.after.get("company", async (object:Object) => { console.log("Afterget : ", object);await delay(10000); console.log("end"); });
+ted.after.save("company", async (object: Object) => {
+  console.log("Aftersave : ", object);
+  await delay(10000);
+  console.log("end");
+});
+ted.after.remove("company", async (object: Object) => {
+  console.log("Afterremove : ", object);
+  await delay(10000);
+  console.log("end");
+});
+ted.after.get("company", async (object: Object) => {
+  console.log("Afterget : ", object);
+  await delay(10000);
+  console.log("end");
+});
 
 ted.afterTasks(3);

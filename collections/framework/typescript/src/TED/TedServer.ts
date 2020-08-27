@@ -3,11 +3,8 @@ import * as crypto from "crypto";
 import { TedRequest } from "./DB";
 import AfterOperation, { AfterTask } from "./AfterOperation";
 
-const PORT = 8080;
-const HOSTNAME = "localhost";
-const TED_URL = "https://localhost:8080";
-
 export type Credentials = {
+  url: string;
   username: string;
   password: string;
 };
@@ -28,7 +25,7 @@ export default class TEDServer {
   }
 
   public async connect(credentials: Credentials): Promise<void> {
-    this.socket = socketIO(TED_URL, {
+    this.socket = socketIO(credentials.url, {
       secure: true,
       rejectUnauthorized: false,
     });

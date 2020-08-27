@@ -88,7 +88,7 @@ function setupBroker(callback: any, prefetchCount: number): TaskBroker {
   switch (config.configuration.ted.broker) {
     case "RabbitMQ": {
       return new RabbitMQBroker(
-        config.configuration.rabbitmq.afterTaskBroker.URL,
+        config.configuration.rabbitmq.url,
         config.configuration.rabbitmq.afterTaskBroker.queueName,
         callback,
         config.configuration.rabbitmq.afterTaskBroker.queueOptions,

@@ -12,6 +12,7 @@ export async function setup(): Promise<void> {
     case "mongodb": {
       client = new mongo.MongoClient(config.configuration.mongodb.url, {
         useUnifiedTopology: true,
+        useNewUrlParser: true,
       });
       await client.connect();
       database = client.db("twake_collections");
