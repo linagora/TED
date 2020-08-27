@@ -1,5 +1,5 @@
 import * as socketIO from "socket.io";
-import * as https from "https";
+import * as http from "http";
 import * as crypto from "crypto";
 import { login, tedRequest, sendTasks } from "./procedures";
 import * as myTypes from "../utils/myTypes";
@@ -15,7 +15,7 @@ type SaltTable = {
 export let authTable: AuthTable = {};
 export let saltTable: SaltTable = {};
 
-export async function setup(httpsServer: https.Server): Promise<void> {
+export async function setup(httpsServer: http.Server): Promise<void> {
   io = require("socket.io")(httpsServer);
   io.on("connection", (socket) => {
     console.log("init :", socket.id);

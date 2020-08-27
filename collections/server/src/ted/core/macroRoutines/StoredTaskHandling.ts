@@ -21,7 +21,7 @@ export function setup(): void {
       console.log("Intializing RabbitMQ interface");
 
       mbInterface = new messageBroker.RabbitMQBroker(
-        config.configuration.rabbitmq.taskBroker.URL,
+        config.configuration.rabbitmq.url,
         config.configuration.rabbitmq.taskBroker.queueName,
         projectTask,
         config.configuration.rabbitmq.taskBroker.queueOptions,
@@ -31,7 +31,7 @@ export function setup(): void {
       );
 
       afterTaskSender = new messageBroker.RabbitMQBroker(
-        config.configuration.rabbitmq.afterTaskBroker.URL,
+        config.configuration.rabbitmq.url,
         config.configuration.rabbitmq.afterTaskBroker.queueName,
         dummyCallback,
         config.configuration.rabbitmq.afterTaskBroker.queueOptions,

@@ -5,7 +5,6 @@ class Configuration {
   setup(configurationFile: string) {
     const config = JSON.parse(fs.readFileSync(configurationFile, "utf8"));
     this.configuration = _.merge(this.configuration, config);
-    console.log(this.configuration);
   }
 
   //Contain default configuration
@@ -43,9 +42,9 @@ class Configuration {
     //=============== RabbitMQ config ===============
 
     rabbitmq: {
+      url: "amqp://localhost",
       taskBroker: {
         queueName: "projection_tasks",
-        URL: "amqp://localhost",
         queueOptions: {
           durable: true,
         },
@@ -57,7 +56,6 @@ class Configuration {
       },
       afterTaskBroker: {
         queueName: "after_tasks",
-        URL: "amqp://localhost",
         queueOptions: {
           durable: true,
         },
