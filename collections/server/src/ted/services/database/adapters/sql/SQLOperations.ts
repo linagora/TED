@@ -2,8 +2,6 @@ import * as myTypes from "../../../utils/myTypes";
 import * as mongoDBTools from "./MongoDBtools";
 import mongo, { ClientSession } from "mongodb";
 import { mongodb } from "../../../../../config/config";
-import { off } from "process";
-import { cursorTo } from "readline";
 
 export type SQLOperation = SQLBaseOperation | SQLBatchOperation | SQLOperationArray;
 
@@ -120,7 +118,6 @@ export class SQLGetOperation extends SQLBaseOperation
             throw new Error("Uninitialized mongoDB collection");
         
         let cursor = this.collection.find(this.queryValue, this.mongoOptions);
-        console.log(cursor);
         let res = await cursor.toArray();
         let offset:number = res.length;
         if(this.mongoOptions?.skip !== undefined)
