@@ -38,7 +38,8 @@ export type GetOptions = {
   limit?: number,
   order?: Order,
   pageToken?: string,
-  where?: WhereClause
+  where?: WhereClause,
+  fullsearch?:any,
 }
 
 export type Order = {
@@ -51,9 +52,11 @@ export type ServerRequest = {
   body:ServerRequestBody;
 }
 
+export type FullsearchSchema = {key:string, type:string}[];
+
 export type TEDSchema =
 {
-    fullsearchIndex:string[];
+    fullsearchIndex:FullsearchSchema;
     wsPrivateKeys:string[];
     dbSearchIndex:string[];
 }
@@ -68,6 +71,7 @@ export type ServerRequestBody = {
   pageToken?:string;
   where?:WhereClause;
   ttl?:number;
+  fullsearch?:any;
 };
 
 export type InternalOperationDescription = {

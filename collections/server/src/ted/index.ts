@@ -10,6 +10,7 @@ import { TimerLogsMap, Timer } from "./services/monitoring/Timer";
 import { CounterMap } from "./services/monitoring/Counter";
 import { setup as promSetup } from "./services/monitoring/PrometheusClient";
 import { setup as mongoSetup } from "./services/database/adapters/sql/MongoDBtools";
+import { setup as fullsearchSetup } from "./services/fullsearch/FullsearchSetup";
 import * as config from "../config/config";
 import * as promClient from "prom-client";
 
@@ -31,6 +32,7 @@ async function setup():Promise<void>
   mbSetup();
   cryptoSetup();
   promSetup();
+  await fullsearchSetup();
   if(["cassandra", "scylladb", "keyspace"].includes(config.ted.dbCore))
     await cassandraSetup();
   else if(["mongodb"].includes(config.ted.dbCore))

@@ -1,7 +1,7 @@
 import * as myTypes from "../../services/utils/myTypes";
 import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
-import getRoutine, { EmptyResultError } from "./GetRoutine";
+import getRoutine, { EmptyResultError, fullsearchRequest } from "./GetRoutine";
 import * as myCrypto from "../../services/utils/cryptographicTools";
 import { SaveTaskStore } from "../tedOperations/TaskStore";
 import { BatchOperation, tableCreationError } from "../../services/database/operations/baseOperations";
@@ -11,6 +11,7 @@ import { Timer } from "../../services/monitoring/Timer";
 import { processPath, delay, truncatePath } from "../../services/utils/divers";
 import { SaveEventStore } from "../tedOperations/EventsTable";
 import * as config from "../../../config/config";
+import { GetMainView } from "../tedOperations/MainProjections";
 
 export async function createOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.GenericOperation>
 {
@@ -56,6 +57,7 @@ export function getInternalOperationDescription(request:myTypes.ServerRequestBod
         collections: processedPath.collections,
         clearObject: request.object,
         options: {
+            fullsearch:request.fullsearch,
             limit:request.limit,
             order:request.order,
             pageToken:request.pageToken,
@@ -179,9 +181,32 @@ export async function runWriteOperation(opDescriptor:myTypes.InternalOperationDe
 async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.ServerAnswer>
 {
     if(opDescriptor.action !== myTypes.action.get) throw new Error("This is not an authorized read operation");
-    let op = await getRoutine(opDescriptor);
-    let res = await op.execute();
-    return res;
+    if((opDescriptor.options as myTypes.GetOptions).fullsearch === undefined)
+    {
+        let op = await getRoutine(opDescriptor);
+        let res = await op.execute();
+        return res;
+    }
+    else
+    {
+        let res:myTypes.ServerSideObject[] = [];
+        let getOps:GetMainView[] = await fullsearchRequest(opDescriptor);
+        for(let op of getOps)
+        {
+            let ans = await op.execute();
+            if(ans.queryResults !== undefined && ans.queryResults.allResultsEnc !== undefined)
+            {
+                res = res.concat(ans.queryResults.allResultsEnc);
+            }
+        }
+        return {
+            status: "success",
+            queryResults: {
+                resultCount: res.length,
+                allResultsEnc: res,
+            }
+        };
+    }
 }
 
 function controlRequest(opDescriptor:myTypes.InternalOperationDescription):void

@@ -1,5 +1,6 @@
 import TEDServer from "./TedServer";
 import { TEDSchema } from "./Schemas";
+import { StringIndexedObject } from "..";
 
 export type TedRequest = SaveRequest | GetRequest  | RemoveRequest;
 
@@ -26,7 +27,7 @@ export type RemoveRequest =
 export type SaveBody = 
 {
     action:"save";
-    object:Object;
+    object:StringIndexedObject;
     schema?:TEDSchema;
 }
 
@@ -37,7 +38,7 @@ export type GetBody =
     limit?:number;
     pageToken?:string;
     where?:WhereClause;
-    advancedSearch?:JSON;
+    fullsearch?:JSON;
 }
 type Order = {
     key:string,

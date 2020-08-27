@@ -224,7 +224,6 @@ export class BatchOperation implements myTypes.GenericOperation
   {
     this.buildOperation();
     if(this.operation === null) throw new Error("Error in batch, operation not built");
-    console.log("batch operation :", this.operation);
     return this.operation.execute()
     .catch(async (err:myTypes.CQLResponseError) =>
     {

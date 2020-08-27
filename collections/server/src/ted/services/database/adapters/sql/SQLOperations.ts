@@ -53,7 +53,6 @@ export class SQLSaveOperation extends SQLBaseOperation
         super(infos);
         this.options = infos.options as mongo.ReplaceOneOptions;
         this.updateValue = {...this.queryValue};
-        console.log(this.updateValue);
     }
 
     protected async buildQuery():Promise<void>
@@ -68,7 +67,6 @@ export class SQLSaveOperation extends SQLBaseOperation
 
     public async execute(session?:mongo.ClientSession):Promise<myTypes.ServerAnswer>
     {
-        console.log(this);
 
         await this.buildQuery();
         if(this.collection === null)
@@ -111,8 +109,6 @@ export class SQLGetOperation extends SQLBaseOperation
 
     public async execute():Promise<myTypes.ServerAnswer>
     {
-        console.log(this);
-
         await this.buildQuery();
         if(this.collection === null)
             throw new Error("Uninitialized mongoDB collection");
@@ -216,8 +212,6 @@ export class SQLRemoveOperation extends SQLBaseOperation
 
     public async execute(session?:ClientSession):Promise<myTypes.ServerAnswer>
     {
-        console.log(this);
-
         await this.buildQuery();
 
         if(this.collection === null)

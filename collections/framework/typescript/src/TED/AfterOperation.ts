@@ -1,6 +1,6 @@
-import TED from "..";
+import TED, { StringIndexedObject } from "..";
 
-export type AfterProcess = (object:Object) => Promise<void>;
+export type AfterProcess = (object:StringIndexedObject) => Promise<void>;
 
 type AfterProcessMap = {
     [path:string]:AfterProcess;
@@ -10,7 +10,7 @@ export type AfterTask =
 {
     action:"save" | "get" | "remove";
     path:string;
-    object:Object;
+    object:StringIndexedObject;
 }
 
 export default class AfterOperation

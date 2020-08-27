@@ -4,6 +4,8 @@ import { globalCounter } from "../../index";
 import { Timer } from "../../services/monitoring/Timer";
 import { GetMainView } from "../tedOperations/MainProjections";
 import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
+import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
+import { buildPath } from "../../services/utils/divers";
 
 export let EmptyResultError = new Error("No matching object found");
 
@@ -63,4 +65,31 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
         }
     });
     return op
+}
+
+export async function fullsearchRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView[]>
+{
+    let path = buildPath(opDescriptor.collections, opDescriptor.documents,false);
+    let matchingKeys:myTypes.ServerSideObject[] = await fullsearchInterface.search((opDescriptor.options as myTypes.GetOptions).fullsearch, path);
+    return buildFullsearchGet(opDescriptor, matchingKeys);
+}
+
+function buildFullsearchGet(opDescriptor:myTypes.InternalOperationDescription, matchingKeys: myTypes.ServerSideObject[]):GetMainView[]
+{
+    let res:GetMainView[] = [];
+    for(let keys of matchingKeys)
+    {
+        let documents:string[] = [];
+        for(let coll of opDescriptor.collections)
+        {
+            documents.push(keys[coll] as string);
+        }
+        res.push(new GetMainView({
+            action: myTypes.action.get,
+            opID: opDescriptor.opID,
+            documents: documents,
+            collections: opDescriptor.collections,
+        }));
+    }
+    return res;
 }
