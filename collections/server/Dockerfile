@@ -8,10 +8,10 @@ COPY . .
 RUN npm run build
 
 # App
-EXPOSE 8080
+EXPOSE 7250
 
 # Monitoring (Prometheus)
-EXPOSE 8081
+EXPOSE 7251
 
 ENTRYPOINT ["npm", "run", "start"]
 

@@ -1,5 +1,10 @@
 # TED - The Extraordinary Database
 
+<p align="center">
+  <img width="240" height="240" src="ted.png">
+</p>
+<br/>
+
 TED is a replicated, encrypted, scalable and realtime collections based database used in Twake. It works on top of Cassandra, Elastic-Search and RabbitMQ.
 
 Read more about Twake collaborative workspace by Linagora on [https://twake.app](https://twake.app)
@@ -39,10 +44,10 @@ docker network create ted-network
 docker run -d --network ted-network -it --name ted-mongo mongo
 docker run -d --network ted-network -it --name ted-rabbitmq rabbitmq:3
 # docker build -t twaketech/ted . #If you want to rebuild the code
-docker run --network ted-network -it -v "/$(pwd)/src/config/:/usr/src/app/src/config/" -p 8080:8080 -p 8081:8081 twaketech/ted --config ./src/config/config.json
+docker run --network ted-network -it -v "/$(pwd)/src/config/:/usr/src/app/src/config/" -p 7250:7250 -p 7251:7251 twaketech/ted --config ./src/config/config.json
 ```
 
-Ted will run on `localhost:8080`.
+Ted will run on `localhost:7250`.
 
 #### 4. Test Ted using our demo framework
 
@@ -66,3 +71,5 @@ Then open Postman or anything and start creating / getting objects ! For instanc
 ## License
 
 TED is licensed under [Affero GPL v3](http://www.gnu.org/licenses/agpl-3.0.html)
+
+TED logo was generated with https://getavataaars.com/ ❤️

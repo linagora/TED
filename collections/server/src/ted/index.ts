@@ -102,7 +102,7 @@ export async function main(_args: any): Promise<void> {
     }
     res.end("go to /metrics");
   });
-  metricServer.listen(8081);
+  metricServer.listen(7251);
 
   let httpServer = http.createServer({}, async function (
     req: http.IncomingMessage,
@@ -131,6 +131,6 @@ export async function main(_args: any): Promise<void> {
     }
   });
   setupSocketcluster(httpServer);
-  httpServer.listen(8080);
+  httpServer.listen(7250);
   initTimer.stop();
 }

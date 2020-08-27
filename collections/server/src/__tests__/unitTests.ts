@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import * as https from "https";
 import post from "axios";
-import { writeFile, readFile } from "fs";
+import { readFile } from "fs";
 
 const agent = new https.Agent({
   rejectUnauthorized: false,
@@ -57,7 +57,7 @@ export function randomObject(): DBObject {
 }
 
 export async function saveObject(obj: DBObject): Promise<void> {
-  const response = await post("https://localhost:8080/", {
+  const response = await post("https://localhost:7250/", {
     httpsAgent: agent,
     data: {
       path: obj.path,
@@ -73,7 +73,7 @@ export async function saveObject(obj: DBObject): Promise<void> {
 }
 
 export async function getObject(path: string): Promise<Object> {
-  const response = await post("https://localhost:8080", {
+  const response = await post("https://localhost:7250", {
     httpsAgent: agent,
     data: {
       path: path,
@@ -102,7 +102,7 @@ export async function getObjectWhere(
   key: string,
   value: number
 ): Promise<Object[]> {
-  const response = await post("https://localhost:8080", {
+  const response = await post("https://localhost:7250", {
     httpsAgent: agent,
     data: {
       path: path,
@@ -141,7 +141,7 @@ export async function writeFusion(): Promise<void> {
 }
 
 export async function removeObject(path: string): Promise<void> {
-  const response = await post("https://localhost:8080/", {
+  const response = await post("https://localhost:7250/", {
     httpsAgent: agent,
     data: {
       path: path,
