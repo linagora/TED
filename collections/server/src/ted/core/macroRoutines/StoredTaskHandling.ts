@@ -72,7 +72,7 @@ async function getPendingOperations(path:string):Promise<myTypes.DBentry[]>
             path: path,
         },
         options: {
-            order: [{key: "op_id", order: "ASC"}],
+            order: {key: "op_id", order: "ASC"},
             limit: config.ted.taskStoreBatchSize
         }
     })

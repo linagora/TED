@@ -2,6 +2,8 @@ import * as myTypes from "../../../utils/myTypes";
 import * as mongoDBTools from "./MongoDBtools";
 import mongo, { ClientSession } from "mongodb";
 import { mongodb } from "../../../../../config/config";
+import { off } from "process";
+import { cursorTo } from "readline";
 
 export type SQLOperation = SQLBaseOperation | SQLBatchOperation | SQLOperationArray;
 
@@ -104,9 +106,8 @@ export class SQLGetOperation extends SQLBaseOperation
 
         this.mongoOptions = {};
         this.mongoOptions.limit = this.options.limit;
-        this.mongoOptions.skip = this.options.page as number;
+        this.mongoOptions.skip = this.options.pageToken === undefined ?undefined : parseInt(this.options.pageToken);
         this.mongoOptions.sort = this.getMongoSort();
-
         this.buildWhereStatement();
     }
 
@@ -118,13 +119,19 @@ export class SQLGetOperation extends SQLBaseOperation
         if(this.collection === null)
             throw new Error("Uninitialized mongoDB collection");
         
-        let res = await this.collection.find(this.queryValue, this.mongoOptions).toArray();
+        let cursor = this.collection.find(this.queryValue, this.mongoOptions);
+        console.log(cursor);
+        let res = await cursor.toArray();
+        let offset:number = res.length;
+        if(this.mongoOptions?.skip !== undefined)
+            offset += this.mongoOptions.skip;
         let answer:myTypes.ServerAnswer = {
             status: "Success",
             queryResults:{
                 resultCount: res.length,
                 allResultsEnc: [],
-                allResultsClear: []
+                allResultsClear: [],
+                pageToken: this.options.limit === res.length ? offset.toString() : undefined,
             }
         };
         for(let result of res)
@@ -140,7 +147,7 @@ export class SQLGetOperation extends SQLBaseOperation
         if(this.options.order === undefined)
             return undefined;
         let res:Array<[string, number]> = [];
-        for(let keyOrder of this.options.order)
+        for(let keyOrder of [this.options.order])
         {
             let orderValue = keyOrder.order === "ASC" ? 1 : -1;
             res.push([keyOrder.key, orderValue]);

@@ -36,8 +36,8 @@ export type SaveOptions = {
 
 export type GetOptions = {
   limit?: number,
-  order?: Order[],
-  page?: unknown,
+  order?: Order,
+  pageToken?: string,
   where?: WhereClause
 }
 
@@ -66,7 +66,8 @@ export type ServerRequestBody = {
   order?:Order;
   limit?:number;
   pageToken?:string;
-  where?:WhereClause
+  where?:WhereClause;
+  ttl?:number;
 };
 
 export type InternalOperationDescription = {
@@ -108,6 +109,7 @@ export type Query = {
 
 export type QueryResult = {
   resultCount:number;
+  pageToken?:string;
   allResultsClear?:ServerSideObject[];
   allResultsEnc?:DBentry[];
 };

@@ -55,7 +55,12 @@ export function getInternalOperationDescription(request:myTypes.ServerRequestBod
         documents: processedPath.documents,
         collections: processedPath.collections,
         clearObject: request.object,
-        options: request.options,
+        options: {
+            limit:request.limit,
+            order:request.order,
+            pageToken:request.pageToken,
+            ttl:request.ttl,
+        },
         schema: request.schema,
         secondaryInfos: request.where === undefined ? undefined : {
             secondaryKey: request.where.key,

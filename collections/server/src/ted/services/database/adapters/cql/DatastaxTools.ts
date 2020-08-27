@@ -85,7 +85,7 @@ export async function runDB(query:myTypes.Query, options?:myTypes.QueryOptions):
   try
   {
     let rs:any;
-    if(options === undefined) options = defaultQueryOptions;
+    options = {...options, ...defaultQueryOptions};
     rs = await client.execute(query.query, query.params, options);
     console.log("   End query ", queryID);
     return processResult(rs);
@@ -163,6 +163,8 @@ function processResult(rs:any):myTypes.ServerAnswer
       queryResults.allResultsClear.push(object);
     }
   }
+  if(rs.pageState !== null && rs.pageState !== undefined)
+    queryResults.pageToken = rs.pageState.toString();
   return {status: "success", queryResults:queryResults};
 }
 
