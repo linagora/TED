@@ -25,16 +25,15 @@ export async function login(
     "sha512"
   );
   if (target.compare(hash) !== 0) {
-    //callback(new Error("Invalid password"), null);
     authTable[socket.id] = false;
-    console.log(socket.id, " : authentication failed");
+    console.log("--- ", socket.id, " : authentication failed");
     socket.emit("loginFail");
-    await delay(100);
+    await delay(50);
     socket.disconnect(true);
-  } else {
+  } 
+  else {
     authTable[socket.id] = true;
-    //callback(null, "authentication successful")
-    console.log(socket.id, " : authentication successful");
+    console.log("--- ", socket.id, " : authentication successful");
     socket.emit("loginSuccess");
   }
 }
@@ -80,7 +79,7 @@ export async function sendTasks(
   broker.runTasks();
   socket.on("disconnect", (reason: any) => {
     broker.stops();
-    console.log(socket.id, " : socket disconnected");
+    console.log("--- ", socket.id, " : socket disconnected");
   });
 }
 

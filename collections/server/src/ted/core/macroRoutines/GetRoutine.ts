@@ -4,6 +4,9 @@ import { globalCounter } from "../../index";
 import { Timer } from "../../services/monitoring/Timer";
 import { GetMainView } from "../tedOperations/MainProjections";
 import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
+import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
+import { buildPath } from "../../services/utils/divers";
+
 
 export let EmptyResultError = new Error("No matching object found");
 
@@ -18,15 +21,15 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
         if(opDescriptor.secondaryInfos === undefined) return new GetMainView(opDescriptor);
 
         let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
+        timer.stop();
         if(matchingIDs.length === 0) throw EmptyResultError;
         let op = buildGetOperation(opDescriptor, matchingIDs);
-        timer.stop();
         return op;
     }
     catch(err)
     {
         if(err === EmptyResultError) throw err;
-        console.log(err);
+        console.error(err);
         timer.stop();
         return new GetMainView(opDescriptor);
     }
@@ -49,6 +52,9 @@ async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription)
 
 function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, matchingIDs: string[]):GetMainView
 {
+    let options:myTypes.GetOptions = {};
+    if(opDescriptor.options !== undefined) options = opDescriptor.options as myTypes.GetOptions;
+
     let op = new GetMainView({
         action: myTypes.action.get,
         opID: opDescriptor.opID,
@@ -59,8 +65,39 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
                 key: opDescriptor.collections.slice(-1)[0],
                 value: matchingIDs,
                 operator: myTypes.Operator.in
-            }
+            },
+            limit: options.limit,
+            fullsearch: options.fullsearch,
+            order: options.order,
+            pageToken: options.pageToken,
         }
     });
     return op
+}
+
+export async function fullsearchRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView[]>
+{
+    let path = buildPath(opDescriptor.collections, opDescriptor.documents,false);
+    let matchingKeys:myTypes.ServerSideObject[] = await fullsearchInterface.search((opDescriptor.options as myTypes.GetOptions).fullsearch, path);
+    return buildFullsearchGet(opDescriptor, matchingKeys);
+}
+
+function buildFullsearchGet(opDescriptor:myTypes.InternalOperationDescription, matchingKeys: myTypes.ServerSideObject[]):GetMainView[]
+{
+    let res:GetMainView[] = [];
+    for(let keys of matchingKeys)
+    {
+        let documents:string[] = [];
+        for(let coll of opDescriptor.collections)
+        {
+            documents.push(keys[coll] as string);
+        }
+        res.push(new GetMainView({
+            action: myTypes.action.get,
+            opID: opDescriptor.opID,
+            documents: documents,
+            collections: opDescriptor.collections,
+        }));
+    }
+    return res;
 }

@@ -6,6 +6,8 @@ import { getPreviousValue, SaveMainView } from "../tedOperations/MainProjections
 import { getSaveSecondaryView, TStoCQLtypes, removePreviousValue, createSecondaryInfos } from "../tedOperations/SecondaryProjections";
 import { tableCreationError, BaseOperation, BatchOperation } from "../../services/database/operations/baseOperations";
 import { schedulingPolicy } from "cluster";
+import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
+import { buildPath } from "../../services/utils/divers";
 
 const noPreviousValue:Error = new Error("Unable to find a previous value");
 
@@ -19,13 +21,12 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     let opArray:BaseOperation[] = [];
     try
     {
-        console.log("getting previous value");
+        console.log(" => getting previous value");
         let previousValueEnc = await getPreviousValue(opDescriptor);
 
         if(previousValueEnc === null) throw noPreviousValue;
         let previousVersion:myTypes.ServerSideObject =  myCrypto.decryptData( previousValueEnc, myCrypto.globalKey);
 
-        console.log("previous value = ", JSON.stringify(previousVersion));
         opDescriptor.clearObject = {...previousVersion, ...opDescriptor.clearObject};
         if(opDescriptor.schema !== undefined)
         {
@@ -41,12 +42,19 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
                     opArray.push(getSaveSecondaryView(opDescriptor, key));
                 }
             }
+            if(opDescriptor.schema.fullsearchIndex !== undefined && opDescriptor.schema.fullsearchIndex.length > 0)
+            {
+                updateFullsearch(opDescriptor);
+            }
         }
         
     }
     catch(err)
     {   
-        console.error(err);
+        if(err === noPreviousValue && opDescriptor.schema !== undefined && opDescriptor.schema.fullsearchIndex !== undefined && opDescriptor.schema.fullsearchIndex.length > 0)
+        {
+            indexFullsearch(opDescriptor);
+        }
         if((err === noPreviousValue || err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
         {
             if(opDescriptor.schema !== undefined)
@@ -66,4 +74,24 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     opArray.push(new SaveMainView(opDescriptor));
     timer.stop();
     return new BatchOperation(opArray, false);
+}
+
+async function updateFullsearch(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+{
+    console.log(" => Updating index");
+    
+    if(opDescriptor.clearObject === undefined) throw new Error("missing object in index operation");
+    if(opDescriptor.schema === undefined || opDescriptor.schema.fullsearchIndex === undefined) throw new Error("missing schema to index object");
+    let path = buildPath(opDescriptor.collections, opDescriptor.documents, false);
+    await fullsearchInterface.update(opDescriptor.clearObject, opDescriptor.schema.fullsearchIndex, path);
+    
+}
+
+async function indexFullsearch(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+{
+    console.log(" => Indexing object");
+    if(opDescriptor.clearObject === undefined) throw new Error("missing object in index operation");
+    if(opDescriptor.schema === undefined || opDescriptor.schema.fullsearchIndex === undefined) throw new Error("missing schema to index object");
+    let path = buildPath(opDescriptor.collections, opDescriptor.documents, false);
+    await fullsearchInterface.index(opDescriptor.clearObject, opDescriptor.schema.fullsearchIndex, path);    
 }

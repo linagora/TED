@@ -119,9 +119,16 @@ export class CQLGetOperation extends CQLBaseOperation
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
+    let options:myTypes.QueryOptions = {};
+    if(this.options.limit !== undefined)
+      options.fetchSize = this.options.limit;
+    if(this.options.pageToken !== undefined)
+      options.pageState = this.options.pageToken;
+    
     globalCounter.inc("cql_get");
     let timer = new Timer("cql_get");
-    let res = await super.execute();
+    if(this.query === null) throw new Error("unable to execute CQL operation, query not built");
+    let res = datastaxTools.runDB(this.query, options);
     timer.stop();
     return res;
   }
@@ -149,18 +156,13 @@ export class CQLGetOperation extends CQLBaseOperation
     if(this.options.order !== undefined)
     {
       res.push("ORDER BY");
-      for(let iter of this.options.order)
+      for(let iter of [this.options.order])
       {
         res.push(iter.key);
         res.push(iter.order);
         res.push(",");
       }
       res = res.slice(0,-1);
-    }
-    if(this.options.limit !== undefined)
-    {
-      res.push("LIMIT");
-      res.push(this.options.limit.toString());
     }
     this.query = {query: res.join(" "), params: params};
   }

@@ -20,6 +20,7 @@
     "typescript": "^3.9.5"
   },
   "dependencies": {
+    "@elastic/elasticsearch": "^7.9.0",
     "@sentry/node": "5.19.1",
     "@types/amqplib": "^0.5.13",
     "@types/deep-equal": "^1.0.1",
