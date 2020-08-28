@@ -37,7 +37,7 @@ class Configuration {
 
     //=============== Redis config ===============
 
-    redisNamespace: "twake_collections",
+    redis: false,
 
     //=============== RabbitMQ config ===============
 

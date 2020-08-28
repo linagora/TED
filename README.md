@@ -70,6 +70,19 @@ Then open Postman or anything and start creating / getting objects ! For instanc
 }
 ```
 
+## Scalability
+
+Ted is scalable, if you want to use Ted in multiple nodes, don't forget to add Redis for websockets distribution. Here is what you should add to the configuration:
+
+```
+  "redis": {
+    "host": "localhost",
+    "port": 6379
+  },
+```
+
+Ted will automatically connect to Redis and start using it to share work between nodes.
+
 ## License
 
 TED is licensed under [Affero GPL v3](http://www.gnu.org/licenses/agpl-3.0.html)
