@@ -9,3 +9,4 @@ src/config/ssl/
 src/config/ssl/key.pem
 src/config/ssl/cert.pem
 src/ted/services/monitoring/logs/
+config.json
