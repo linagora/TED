@@ -18,7 +18,7 @@ export let saltTable: SaltTable = {};
 export async function setup(httpsServer: http.Server): Promise<void> {
   io = require("socket.io")(httpsServer);
   io.on("connection", (socket) => {
-    console.log("init :", socket.id);
+    console.log("Socket initialization :", socket.id);
 
     let salt: Buffer = crypto.randomBytes(16);
     saltTable[socket.id] = salt;
@@ -43,17 +43,17 @@ export async function setup(httpsServer: http.Server): Promise<void> {
         let notAuthError = new Error("User not authentified");
         notAuthError.name = "notAuthError";
         callback(notAuthError, null);
-        console.log("Unauthorized socket is trying to access afterTasks");
+        console.log("--- ", socket.id, " : unauthorized socket is trying to access afterTasks");
         return;
       }
-      console.log("Access to afterTasks granted");
+      console.log("--- ", socket.id, " : access to afterTasks granted");
       sendTasks(socket, prefetchCount);
     });
 
     socket.on("disconnect", (reason) => {
       delete saltTable[socket.id];
       delete authTable[socket.id];
-      console.log(socket.id, " : disconnected");
+      console.log("--- ", socket.id, " : disconnected");
     });
   });
 }
@@ -69,7 +69,6 @@ export async function sendToSocket(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
-      console.log("sending afterSave");
       let socket = io.sockets.connected[afterSaveInfos.senderID];
       if (!isAuth(socket)) throw new Error("Socket not authenticated");
       socket.emit(event, data, () => resolve());

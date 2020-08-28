@@ -24,11 +24,13 @@ export default class TEDServer {
   loginPromise:Promise<void>;
   loginLock:ExternalResolver;
   after: AfterOperation;
+  first:boolean;
 
   constructor(after: AfterOperation) {
     this.after = after;
     this.socket = null;
     this.salt = Buffer.alloc(16);
+    this.first = true;
 
     let lock:ExternalResolver = {res:()=>{}, rej:()=>{}};
     this.loginPromise = new Promise((resolve, reject) =>
@@ -147,9 +149,13 @@ export default class TEDServer {
       }
     });
 
-    this.socket?.on("reconnect", () => {
-      this.runTasks(prefetch);
-    });
+    if(this.first)
+    {
+      this.socket?.on("reconnect", () => {
+        this.runTasks(prefetch);
+      });
+    }
+    this.first = false;
   }
 }
 

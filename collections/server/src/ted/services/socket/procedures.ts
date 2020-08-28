@@ -26,14 +26,14 @@ export async function login(
   );
   if (target.compare(hash) !== 0) {
     authTable[socket.id] = false;
-    console.log(socket.id, " : authentication failed");
+    console.log("--- ", socket.id, " : authentication failed");
     socket.emit("loginFail");
     await delay(50);
     socket.disconnect(true);
   } 
   else {
     authTable[socket.id] = true;
-    console.log(socket.id, " : authentication successful");
+    console.log("--- ", socket.id, " : authentication successful");
     socket.emit("loginSuccess");
   }
 }
@@ -79,7 +79,7 @@ export async function sendTasks(
   broker.runTasks();
   socket.on("disconnect", (reason: any) => {
     broker.stops();
-    console.log(socket.id, " : socket disconnected");
+    console.log("--- ", socket.id, " : socket disconnected");
   });
 }
 
