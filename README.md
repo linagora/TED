@@ -46,10 +46,10 @@ docker network create ted-network
 docker run -d --network ted-network -it --name ted-mongo mongo
 docker run -d --network ted-network -it --name ted-rabbitmq rabbitmq:3
 # docker build -t twaketech/ted . #If you want to rebuild the code
-docker run --network ted-network -it -v "/$(pwd)/src/config/:/usr/src/app/src/config/" -p 7250:7250 -p 7251:7251 twaketech/ted --config ./src/config/config.json
+docker run --network ted-network -it -v "/$(pwd)/src/config/:/usr/src/app/src/config/" -p 7250:7250 -p 7251:7251 -p 7252:7252 twaketech/ted --config ./src/config/config.json
 ```
 
-Ted will run on `localhost:7250`.
+Ted will run on `localhost:7250`, port 7252 is used for websockets (browser to ted).
 
 #### 4. Test Ted using our demo framework
 
