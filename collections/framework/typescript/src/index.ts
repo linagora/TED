@@ -11,17 +11,25 @@ import Schemas from "./TED/Schemas";
 import express from "express";
 import { Schema } from "inspector";
 
-export type HTTPSaveBody = {
-  object: Object;
-};
 
-export type HTTPGetBody = {
-  order?: Order;
-  limit?: number;
-  pageToken?: string;
-  where?: WhereClause;
-  advancedSearch?: JSON;
-};
+export type StringIndexedObject =
+{
+  [key:string]:any;
+}
+
+export type HTTPSaveBody = 
+{
+  object:StringIndexedObject;
+}
+
+export type HTTPGetBody = 
+{
+  order?:Order;
+  limit?:number;
+  pageToken?:string;
+  where?:WhereClause;
+  fullsearch?:JSON;
+}
 type Order = {
   key: string;
   order: "ASC" | "DESC";
@@ -130,7 +138,7 @@ export default class TED {
         limit: get.limit,
         pageToken: get.pageToken,
         where: get.where,
-        advancedSearch: get.advancedSearch,
+        fullsearch: get.fullsearch,
       },
     };
     console.log(path);

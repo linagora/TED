@@ -25,7 +25,7 @@ export class SaveTaskStore extends SaveOperation {
   }
 
   public async execute(): Promise<myTypes.ServerAnswer> {
-    return await super
+    let res = await super
       .execute()
       .catch(async (err: myTypes.CQLResponseError) => {
         if (
@@ -39,7 +39,11 @@ export class SaveTaskStore extends SaveOperation {
         console.error(err);
         return { status: "error", error: err };
       });
+    this.done();
+    return res
   }
+
+  public done():void { console.log("---TaskStore write OK"); }
 
   protected static createLog(
     operation: myTypes.InternalOperationDescription
@@ -92,6 +96,15 @@ export class GetTaskStore extends GetOperation {
     this.buildOperation();
   }
 
+  public async execute():Promise<myTypes.ServerAnswer>
+  {
+    let res = await super.execute();
+    this.done();
+    return res;
+  }
+
+  public done():void { console.log("---TaskStore read OK"); }
+
   public buildTableName(): string {
     return "global_taskstore";
   }
@@ -114,6 +127,15 @@ export class RemoveTaskStore extends RemoveOperation {
     this.table = this.buildTableName();
     this.buildOperation();
   }
+
+  public async execute():Promise<myTypes.ServerAnswer>
+  {
+    let res = await super.execute();
+    this.done();
+    return res;
+  }
+
+  public done():void { console.log("---TaskStore remove OK"); }
 
   public buildTableName(): string {
     return "global_taskstore";

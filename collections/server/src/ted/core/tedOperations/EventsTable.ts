@@ -20,7 +20,7 @@ export class SaveEventStore extends SaveOperation
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
-    return await super.execute()
+    let res = await super.execute()
     .catch(async (err:myTypes.CQLResponseError) =>
     {
       if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
@@ -28,11 +28,14 @@ export class SaveEventStore extends SaveOperation
         await this.createTable();
         throw tableCreationError;
       } 
-      console.log(err.message);
-      return {status:"error", error:err};
+      console.error(err.message);
+      return {status:"error", error:err.message};
     });
+    this.done();
+    return res;
   }
   
+  public done():void { console.log("---EventStore write OK"); }
 
   public buildTableName():string
   {

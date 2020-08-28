@@ -5,6 +5,8 @@ import { Timer } from "../../services/monitoring/Timer";
 import { RemoveMainView, getPreviousValue } from "../tedOperations/MainProjections";
 import { BatchOperation, BaseOperation } from "../../services/database/operations/baseOperations";
 import { TStoCQLtypes, getRemoveSecondaryView, createSecondaryInfos } from "../tedOperations/SecondaryProjections";
+import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
+import { buildPath } from "../../services/utils/divers";
 
 export default async function removeRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<BatchOperation>
 {
@@ -30,6 +32,10 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
                     }
                 }
             }
+            if(opDescriptor.schema.fullsearchIndex !== undefined && opDescriptor.schema.fullsearchIndex.length > 0)
+            {
+                deleteFullsearch(opDescriptor);
+            }
         }
     }
     else
@@ -38,4 +44,11 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
     }
     timer.stop();
     return new BatchOperation(opArray, false);
+}
+
+async function deleteFullsearch(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
+{
+    if(opDescriptor.schema === undefined || opDescriptor.schema.fullsearchIndex === undefined) throw new Error("missing schema to index object");
+    let path = buildPath(opDescriptor.collections, opDescriptor.documents, false);
+    fullsearchInterface.delete(opDescriptor.schema.fullsearchIndex, path);
 }

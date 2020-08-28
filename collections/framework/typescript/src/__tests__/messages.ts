@@ -1,6 +1,7 @@
 import express from "express";
 import TED, { HttpError } from "../index";
 import { delay } from "../TED/TedServer";
+import {defaultTyping} from "../TED/Schemas";
 
 let ted = new TED();
 
@@ -38,9 +39,36 @@ app.listen(9000);
 
 console.log("running");
 
-ted.schemas.add("company", {
-  fullsearchIndex: {
-    default: false,
+ted.schemas.add("company",{
+  fullsearchIndex:{
+    defaultIndexation:false,
+    defaultTyping: defaultTyping,
+    keys:{
+      "auteur":"wildcard",
+      "content":"text"
+    }
+  },
+  dbSearchIndex:{
+    default:false,
+    content:true,
+    auteur:true,
+    pouet:true,
+    null:true,
+    piege:false
+  },
+  wsPrivateKeys:{
+    default:false
+  }
+});
+
+ted.schemas.add("company/channel",{
+  fullsearchIndex:{
+    defaultIndexation:false,
+    defaultTyping: defaultTyping,
+    keys:{
+      "auteur":"wildcard",
+      "content":"text"
+    }
   },
   dbSearchIndex: {
     default: false,

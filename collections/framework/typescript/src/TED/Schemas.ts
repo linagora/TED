@@ -1,4 +1,4 @@
-import TED from "..";
+import TED, { StringIndexedObject } from "..";
 
 export type SchemaDescription =
 {
@@ -6,16 +6,25 @@ export type SchemaDescription =
     [key:string]:true | false | undefined;
 }
 
+export type FullsearchSchema =
+{
+    defaultIndexation:boolean;
+    defaultTyping:EStyping;
+    keys:{ [key:string]:string };
+}
+
 export type Schema =
 {
-    fullsearchIndex:SchemaDescription;
+    fullsearchIndex:FullsearchSchema;
     wsPrivateKeys:SchemaDescription;
     dbSearchIndex:SchemaDescription;
 }
 
+export type TEDFullsearchSchema = {key:string, type:string}[];
+
 export type TEDSchema =
 {
-    fullsearchIndex:string[];
+    fullsearchIndex:TEDFullsearchSchema;
     wsPrivateKeys:string[];
     dbSearchIndex:string[];
 }
@@ -25,17 +34,30 @@ export type SchemaMap =
     [collection:string]:Schema;
 }
 
+type EStyping =
+{
+    string:"wildcard"|"keyword"|"text",
+    number:"float"|"double"|"integer"|"long"|"short",
+    boolean:"boolean",
+    bigint:"integer"|"long"|"short",
+}
+export const defaultTyping:EStyping = {
+    string:"wildcard",
+    number:"float",
+    boolean:"boolean",
+    bigint:"long",
+}
+
 export default class SchemasTable
 {
     schemas:SchemaMap = {};
 
     public add(path:string, schema:Schema):void
     {
-        let collectionPath = TED.getCollectionPath(path);
-        this.schemas[collectionPath] = schema;
+        this.schemas[path] = schema;
     }
 
-    public get(path:string, object?:Object):TEDSchema
+    public get(path:string, object?:StringIndexedObject):TEDSchema
     {
         let keys:string[];
         let collectionPath = TED.getCollectionPath(path);
@@ -57,7 +79,7 @@ export default class SchemasTable
         }
 
         return {
-            fullsearchIndex: SchemasTable.tedify(schema.fullsearchIndex, keys),
+            fullsearchIndex: SchemasTable.tedifyFS(schema.fullsearchIndex, keys, object),
             wsPrivateKeys: SchemasTable.tedify(schema.wsPrivateKeys, keys),
             dbSearchIndex: SchemasTable.tedify(schema.dbSearchIndex, keys)
         };
@@ -74,4 +96,49 @@ export default class SchemasTable
         return res;
     }
 
+    private static tedifyFS(schema:FullsearchSchema, keys:string[], object?:StringIndexedObject):TEDFullsearchSchema
+    {
+        let res:TEDFullsearchSchema = [];
+        for(let key of keys)
+        {
+            if( schema.keys[key] !== undefined)
+            {
+                res.push({key: key, type: schema.keys[key]});
+            }
+            else if(object !== undefined && schema.defaultIndexation && Object.keys(object).includes(key))
+            {
+                switch(typeof(object[key]))
+                {
+                    case "function":
+                    case "object":
+                    case "undefined":
+                    case "symbol":
+                    {
+                        throw new Error("Types unsupported for fullsearch yet");
+                    }
+                    case "number":
+                    {
+                        res.push({key: key, type: schema.defaultTyping.number});
+                        break;
+                    }
+                    case "string":
+                    { 
+                        res.push({key: key, type: schema.defaultTyping.string});
+                        break;
+                    }
+                    case "boolean":
+                    {
+                        res.push({key: key, type: schema.defaultTyping.boolean});
+                        break;
+                    }
+                    case "bigint":
+                    {
+                        res.push({key: key, type: schema.defaultTyping.bigint});
+                        break;
+                    }
+                }
+            }
+        }
+        return res;
+    }
 }

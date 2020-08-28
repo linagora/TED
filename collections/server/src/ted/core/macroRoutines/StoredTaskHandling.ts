@@ -79,7 +79,8 @@ export async function projectTask(path: string): Promise<void> {
 
 async function dummyCallback(path: string): Promise<void> {}
 
-async function getPendingOperations(path: string): Promise<myTypes.DBentry[]> {
+async function getPendingOperations(path: string): Promise<myTypes.DBentry[]>
+{
   let timer = new Timer("taskstore_read");
   let processedPath = processPath(path);
   let getOperation = new GetTaskStore({
@@ -91,13 +92,12 @@ async function getPendingOperations(path: string): Promise<myTypes.DBentry[]> {
       path: path,
     },
     options: {
-      order: [{ key: "op_id", order: "ASC" }],
+      order: { key: "op_id", order: "ASC" },
       limit: config.configuration.ted.taskStoreBatchSize,
     },
   });
-  console.log("reading DB");
   let result = await getOperation.execute();
-  console.log("pending operation : ", result.queryResults);
+  //console.log("pending operations : ",   result.queryResults?.allResultsEnc?.map( (value) => JSON.parse(value["object"]) ));
 
   if (
     result.queryResults === undefined ||

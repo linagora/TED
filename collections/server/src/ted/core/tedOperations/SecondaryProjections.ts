@@ -25,7 +25,7 @@ export class SaveSecondaryView extends SaveOperation
 
     public async execute():Promise<myTypes.ServerAnswer>
     {
-        return super.execute()
+        let res = await super.execute()
         .catch(async (err:myTypes.CQLResponseError) =>
         {
             if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
@@ -36,7 +36,11 @@ export class SaveSecondaryView extends SaveOperation
             console.error(err);
             return {status:"error", error:err};
         });
+        this.done();
+        return res;
     }
+
+    public done():void { console.log("---SecondaryView write OK"); }
 
     public buildTableName():string
     {
@@ -101,8 +105,11 @@ export class GetSecondaryView extends GetOperation
     public async execute():Promise<myTypes.ServerAnswer>
     {
         let res = await super.execute();
+        this.done();
         return res;
     }
+
+    public done():void { console.log("---SecondaryView read OK"); }
 
     public buildTableName():string
     {
@@ -139,8 +146,11 @@ export class RemoveSecondaryView extends RemoveOperation
     public async execute():Promise<myTypes.ServerAnswer>
     {
         let res = await super.execute();
+        this.done();
         return res;
     }
+
+    public done():void { console.log("---SecondaryView remove OK"); }
 
     public buildTableName():string
     {

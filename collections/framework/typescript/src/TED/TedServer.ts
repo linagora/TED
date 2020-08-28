@@ -2,6 +2,8 @@ import socketIO from "socket.io-client";
 import * as crypto from "crypto";
 import { TedRequest } from "./DB";
 import AfterOperation, { AfterTask } from "./AfterOperation";
+import { resolve } from "path";
+import { rejects } from "assert";
 
 export type Credentials = {
   url: string;
@@ -9,19 +11,45 @@ export type Credentials = {
   password: string;
 };
 
+type ExternalResolver = {
+  res: () => void;
+  rej: () => void;
+};
+
 let nullSocketError = new Error("TED socket has been deleted.");
 
 export default class TEDServer {
   socket: SocketIOClient.Socket | null;
   salt: Buffer;
-  logged: boolean;
+  loginPromise:Promise<void>;
+  loginLock:ExternalResolver;
   after: AfterOperation;
+  first:boolean;
 
   constructor(after: AfterOperation) {
     this.after = after;
     this.socket = null;
-    this.logged = false;
     this.salt = Buffer.alloc(16);
+    this.first = true;
+
+    let lock:ExternalResolver = {res:()=>{}, rej:()=>{}};
+    this.loginPromise = new Promise((resolve, reject) =>
+    {
+      lock.res = resolve;
+      lock.rej = reject;
+    });
+    this.loginLock = lock;
+  }
+
+  private initLoginLock()
+  {
+    let lock:ExternalResolver = {res:()=>{}, rej:()=>{}};
+    this.loginPromise = new Promise((resolve, reject) =>
+    {
+      lock.res = resolve;
+      lock.rej = reject;
+    });
+    this.loginLock = lock;
   }
 
   public async connect(credentials: Credentials): Promise<void> {
@@ -31,8 +59,7 @@ export default class TEDServer {
     });
     let that = this;
 
-    this.socket.on("authenticate", (salt: Buffer, login: any) => {
-      //let hmac = crypto.createHmac("sha512", salt);
+    this.socket.on("authenticate", async (salt: Buffer, login: any) => {
       let hash: Buffer = crypto.pbkdf2Sync(
         credentials.password,
         salt,
@@ -41,10 +68,11 @@ export default class TEDServer {
         "sha512"
       );
       login(hash);
+      await delay(100);
     });
 
     this.socket.on("disconnect", async (reason: string) => {
-      that.logged = false;
+      that.initLoginLock();
       console.log("disconnected");
       await delay(1000);
       if (reason === "io server disconnect") {
@@ -63,16 +91,27 @@ export default class TEDServer {
 
     this.socket.on("loginSuccess", () => {
       console.log("Login successful");
-      that.logged = true;
+      that.loginLock.res();
     });
 
     this.socket.on("loginFail", () => {
       console.log("Invalid credentials");
-      that.logged = false;
+      that.loginLock.rej();
+    });
+
+    this.socket?.on("runTask", async (task: AfterTask, callback: any) => {
+      try {
+        await this.after.run(task);
+        callback(null);
+      } catch (err) {
+        console.error(err);
+        callback(err.message);
+      }
     });
   }
 
   public async request(request: TedRequest): Promise<any> {
+    await this.loginPromise;
     return new Promise((resolve, reject) => {
       try {
         console.log("sending :", request);
@@ -81,7 +120,6 @@ export default class TEDServer {
           throw new Error(
             "TED currently disconnected, please try again after reconnection"
           );
-        if (!this.logged) throw new Error("Not logged in");
         this.socket.emit("tedRequest", request, (err: any, result: any) => {
           if (err !== null) {
             let error = new Error("TED Error : " + err);
@@ -99,23 +137,25 @@ export default class TEDServer {
     });
   }
 
-  public runTasks(prefetch: number): void {
+  public async runTasks(prefetch: number): Promise<void> {
+    await this.loginPromise;
     console.log("getting tasks...");
-    this.socket?.on("runTask", async (task: AfterTask, callback: any) => {
-      try {
-        await this.after.run(task);
-        callback(null);
-      } catch (err) {
+
+    this.socket?.emit("sendTasks", prefetch, async (err:any , data:any) =>
+    {
+      if(err !== null)
+      {
         console.error(err);
-        callback(err.message);
       }
     });
 
-    this.socket?.emit("sendTasks", prefetch);
-
-    this.socket?.on("reconnect", () => {
-      this.socket?.emit("sendTasks", prefetch);
-    });
+    if(this.first)
+    {
+      this.socket?.on("reconnect", () => {
+        this.runTasks(prefetch);
+      });
+    }
+    this.first = false;
   }
 }
 

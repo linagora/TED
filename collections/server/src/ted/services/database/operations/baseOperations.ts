@@ -92,6 +92,8 @@ export abstract class BaseOperation implements myTypes.GenericOperation {
   }
 
   public abstract async createTable(): Promise<void>;
+
+  public abstract done():void;
 }
 
 export abstract class SaveOperation extends BaseOperation {
@@ -220,22 +222,21 @@ export class BatchOperation implements myTypes.GenericOperation {
 
   public async execute(): Promise<myTypes.ServerAnswer> {
     this.buildOperation();
-    if (this.operation === null)
-      throw new Error("Error in batch, operation not built");
-    console.log("batch operation :", this.operation);
-    return this.operation
-      .execute()
-      .catch(async (err: myTypes.CQLResponseError) => {
-        if (
-          (err.code === 8704 &&
-            err.message.substr(0, 18) === "unconfigured table") ||
-          err.message.match(/^Collection ([a-zA-z_]*) does not exist./)
-        ) {
-          await this.createAllTables();
-          throw tableCreationError;
-        }
-        throw err;
-      });
+    if(this.operation === null) throw new Error("Error in batch, operation not built");
+    let res = await this.operation.execute()
+    .catch(async (err:myTypes.CQLResponseError) =>
+    {
+      if((err.code === 8704 
+        && err.message.substr(0,18) === "unconfigured table") 
+        || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
+      {
+        await this.createAllTables();
+        throw tableCreationError;
+      }
+      throw err;
+    });
+    this.operationsArray.map( (op) => op.done());
+    return res;
   }
 
   public push(operation: BaseOperation) {
@@ -284,7 +285,6 @@ export class BatchOperation implements myTypes.GenericOperation {
     if (parse === null)
       throw new Error("Unable to parse table name in batch error");
     let tableName = parse[0];
-    console.log(tableName);
     for (let op of this.operationsArray) {
       let tmp = op.buildTableName();
       if (tmp === tableName) {

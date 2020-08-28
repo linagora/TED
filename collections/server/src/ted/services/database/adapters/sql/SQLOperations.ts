@@ -47,11 +47,11 @@ export class SQLSaveOperation extends SQLBaseOperation {
 
   tableCreationFlag: boolean = false;
 
-  constructor(infos: myTypes.CQLOperationInfos) {
+  constructor(infos:myTypes.CQLOperationInfos)
+  {
     super(infos);
     this.options = infos.options as mongo.ReplaceOneOptions;
-    this.updateValue = { ...this.queryValue };
-    console.log(this.updateValue);
+    this.updateValue = {...this.queryValue};
   }
 
   protected async buildQuery(): Promise<void> {
@@ -65,7 +65,6 @@ export class SQLSaveOperation extends SQLBaseOperation {
   public async execute(
     session?: mongo.ClientSession
   ): Promise<myTypes.ServerAnswer> {
-    console.log(this);
 
     await this.buildQuery();
     if (this.collection === null)
@@ -104,43 +103,51 @@ export class SQLGetOperation extends SQLBaseOperation {
 
     this.mongoOptions = {};
     this.mongoOptions.limit = this.options.limit;
-    this.mongoOptions.skip = this.options.page as number;
+    this.mongoOptions.skip = this.options.pageToken === undefined 
+      ? undefined 
+      : parseInt(this.options.pageToken);
     this.mongoOptions.sort = this.getMongoSort();
 
     this.buildWhereStatement();
   }
 
-  public async execute(): Promise<myTypes.ServerAnswer> {
-    console.log(this);
-
+  public async execute():Promise<myTypes.ServerAnswer>
+  {
     await this.buildQuery();
-    if (this.collection === null)
+    if(this.collection === null)
       throw new Error("Uninitialized mongoDB collection");
-
-    let res = await this.collection
-      .find(this.queryValue, this.mongoOptions)
-      .toArray();
-    let answer: myTypes.ServerAnswer = {
+    
+    let cursor = this.collection.find(this.queryValue, this.mongoOptions);
+    let res = await cursor.toArray();
+    let offset:number = res.length;
+    if(this.mongoOptions?.skip !== undefined)
+      offset += this.mongoOptions.skip;
+    let answer:myTypes.ServerAnswer = 
+    {
       status: "Success",
-      queryResults: {
+      queryResults:{
         resultCount: res.length,
         allResultsEnc: [],
         allResultsClear: [],
-      },
+        pageToken: this.options.limit === res.length 
+          ? offset.toString() 
+          : undefined,
+      }
     };
-    for (let result of res) {
-      Object.keys(result).includes("object")
-        ? answer.queryResults?.allResultsEnc?.push(result)
-        : answer.queryResults?.allResultsClear?.push(result);
+    for(let result of res)
+    {
+      Object.keys(result).includes("object") ? answer.queryResults?.allResultsEnc?.push(result) : answer.queryResults?.allResultsClear?.push(result);
     }
-    console.log(answer);
     return answer;
   }
 
-  protected getMongoSort(): Array<[string, number]> | undefined {
-    if (this.options.order === undefined) return undefined;
-    let res: Array<[string, number]> = [];
-    for (let keyOrder of this.options.order) {
+  protected getMongoSort():Array<[string, number]> | undefined
+  {
+    if(this.options.order === undefined)
+      return undefined;
+    let res:Array<[string, number]> = [];
+    for(let keyOrder of [this.options.order])
+    {
       let orderValue = keyOrder.order === "ASC" ? 1 : -1;
       res.push([keyOrder.key, orderValue]);
     }
@@ -195,11 +202,8 @@ export class SQLRemoveOperation extends SQLBaseOperation {
     super(infos);
   }
 
-  public async execute(
-    session?: mongo.ClientSession
-  ): Promise<myTypes.ServerAnswer> {
-    console.log(this);
-
+  public async execute(session?:mongo.ClientSession):Promise<myTypes.ServerAnswer>
+  {
     await this.buildQuery();
 
     if (this.collection === null)

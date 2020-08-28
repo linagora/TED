@@ -75,7 +75,7 @@ export async function setup(): Promise<void> {
         err.message.match("^Keyspace '.*' does not exist$")
       ) {
         console.error(err);
-        console.log("trying to create keyspace");
+        console.log("Creating keyspace");
         return await createKeyspace(
           config.configuration.cassandra.keyspace,
           config.configuration.cassandra
@@ -90,16 +90,12 @@ export async function runDB(
   query: myTypes.Query,
   options?: myTypes.QueryOptions
 ): Promise<myTypes.ServerAnswer> {
-  let queryID = uuidv4();
-  console.log("Begin query " + queryID + ",\n   " + JSON.stringify(query));
   try {
     let rs: any;
-    if (options === undefined) options = defaultQueryOptions;
+    options = {...options, ...defaultQueryOptions};
     rs = await client.execute(query.query, query.params, options);
-    console.log("   End query ", queryID);
     return processResult(rs);
   } catch (err) {
-    console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
 }
@@ -111,8 +107,6 @@ export async function runMultiOpDB(
   let queryStr: string[] = queries.map((value: myTypes.Query) =>
     JSON.stringify(value)
   );
-  let queryID = uuidv4();
-  console.log("Begin query " + queryID + ",\n  ", queryStr.join(";\n   "));
   try {
     if (options === undefined) options = defaultQueryOptions;
     let promises: Promise<unknown>[] = [];
@@ -120,10 +114,8 @@ export async function runMultiOpDB(
       promises.push(client.execute(query.query, query.params, options));
     }
     await Promise.all(promises);
-    console.log("   End query ", queryID);
     return { status: "success" };
   } catch (err) {
-    console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
 }
@@ -135,15 +127,11 @@ export async function runBatchDB(
   let queryStr: string[] = queries.map((value: myTypes.Query) =>
     JSON.stringify(value)
   );
-  let queryID = uuidv4();
-  console.log("Begin query " + queryID + ",\n  ", queryStr.join(";\n   "));
   try {
     if (options === undefined) options = defaultQueryOptions;
     await client.batch(queries, options);
-    console.log("   End query ", queryID);
     return { status: "success" };
   } catch (err) {
-    console.log("   Error thrown by query ", queryID, "  :  ", err.message);
     throw err;
   }
 }
@@ -168,7 +156,9 @@ function processResult(rs: any): myTypes.ServerAnswer {
       queryResults.allResultsClear.push(object);
     }
   }
-  return { status: "success", queryResults: queryResults };
+  if(rs.pageState !== null && rs.pageState !== undefined)
+    queryResults.pageToken = rs.pageState.toString();
+  return {status: "success", queryResults:queryResults};
 }
 
 export async function createKeyspace(

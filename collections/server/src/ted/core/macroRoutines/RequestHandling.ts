@@ -1,7 +1,7 @@
 import * as myTypes from "../../services/utils/myTypes";
 import saveRoutine from "./SaveRoutine";
 import removeRoutine from "./RemoveRoutine";
-import getRoutine, { EmptyResultError } from "./GetRoutine";
+import getRoutine, { EmptyResultError, fullsearchRequest } from "./GetRoutine";
 import * as myCrypto from "../../services/utils/cryptographicTools";
 import { SaveTaskStore } from "../tedOperations/TaskStore";
 import {
@@ -13,35 +13,8 @@ import { v1 as uuidv1 } from "uuid";
 import { Timer } from "../../services/monitoring/Timer";
 import { processPath, delay, truncatePath } from "../../services/utils/divers";
 import { SaveEventStore } from "../tedOperations/EventsTable";
+import { GetMainView } from "../tedOperations/MainProjections";
 import config from "../../services/configuration/configuration";
-
-export async function createOperation(
-  opDescriptor: myTypes.InternalOperationDescription
-): Promise<myTypes.GenericOperation> {
-  try {
-    //if((opDescriptor.collections === [] || opDescriptor.documents === []) && opDescriptor.action !== myTypes.action.batch) throw new Error("missing field path in request");
-    switch (opDescriptor.action) {
-      case myTypes.action.save: {
-        if (opDescriptor.encObject == undefined)
-          throw new Error("Encrypted object not created in save request");
-        return saveRoutine(opDescriptor);
-      }
-      case myTypes.action.get: {
-        return getRoutine(opDescriptor);
-      }
-      case myTypes.action.remove: {
-        return removeRoutine(opDescriptor);
-      }
-      default: {
-        throw new Error("Unknown action in request");
-      }
-    }
-  } catch (err) {
-    console.log("Responsible opDescriptor =\n", opDescriptor);
-    console.log("Failed to create operation: \n", err);
-    throw err;
-  }
-}
 
 export function getInternalOperationDescription(
   request: myTypes.ServerRequestBody,
@@ -55,7 +28,13 @@ export function getInternalOperationDescription(
     documents: processedPath.documents,
     collections: processedPath.collections,
     clearObject: request.object,
-    options: request.options,
+    options: {
+        fullsearch:request.fullsearch,
+        limit:request.limit,
+        order:request.order,
+        pageToken:request.pageToken,
+        ttl:request.ttl,
+    },
     schema: request.schema,
     secondaryInfos:
       request.where === undefined
@@ -67,7 +46,7 @@ export function getInternalOperationDescription(
           },
     afterTask: afterTask,
   };
-  console.log(opDescriptor);
+  console.log("\n ========== New request ==========\n", opDescriptor.action, " operation on ", path);
   return opDescriptor;
 }
 
@@ -87,13 +66,14 @@ export default async function handleRequest(
     switch (opDescriptor.action) {
       case myTypes.action.save:
       case myTypes.action.remove: {
-        let totalResponseTime = new Timer("write_request");
+        let logTimer = new Timer("write_request");
         await logEvent(opDescriptor);
+        logTimer.stop();
         let timer = new Timer("mb_write");
         if (mbInterface !== null)
           await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
         timer.stop();
-        totalResponseTime.stop();
+        console.log("Operation logged and added to the MQ");
         return { status: "Success" };
       }
       case myTypes.action.get: {
@@ -122,12 +102,13 @@ export async function logEvent(
   let enableIsolation = config.configuration.ted.dbCore !== "keyspace";
   let opWrite = new BatchOperation(
     [new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)],
-    false
+    enableIsolation
   );
   try {
     await opWrite.execute();
     timer.stop();
-  } catch (err) {
+  } 
+  catch (err) {
     console.error(err);
     if (err === tableCreationError) {
       await delay(1000);
@@ -168,14 +149,35 @@ export async function runWriteOperation(
   }
 }
 
-async function runReadOperation(
-  opDescriptor: myTypes.InternalOperationDescription
-): Promise<myTypes.ServerAnswer> {
-  if (opDescriptor.action !== myTypes.action.get)
-    throw new Error("This is not an authorized read operation");
-  let op = await getRoutine(opDescriptor);
-  let res = await op.execute();
-  return res;
+async function runReadOperation(opDescriptor:myTypes.InternalOperationDescription):Promise<myTypes.ServerAnswer>
+{
+    if(opDescriptor.action !== myTypes.action.get) throw new Error("This is not an authorized read operation");
+    if((opDescriptor.options as myTypes.GetOptions).fullsearch === undefined)
+    {
+        let op = await getRoutine(opDescriptor);
+        let res = await op.execute();
+        return res;
+    }
+    else
+    {
+        let res:myTypes.ServerSideObject[] = [];
+        let getOps:GetMainView[] = await fullsearchRequest(opDescriptor);
+        for(let op of getOps)
+        {
+            let ans = await op.execute();
+            if(ans.queryResults !== undefined && ans.queryResults.allResultsEnc !== undefined)
+            {
+                res = res.concat(ans.queryResults.allResultsEnc);
+            }
+        }
+        return {
+            status: "success",
+            queryResults: {
+                resultCount: res.length,
+                allResultsEnc: res,
+            }
+        };
+    }
 }
 
 function controlRequest(
