@@ -121,10 +121,12 @@ export class SQLGetOperation extends SQLBaseOperation {
     
     let cursor = this.collection.find(this.queryValue, this.mongoOptions);
     let res = await cursor.toArray();
+    console.log(res)
     let offset:number = res.length;
     if(this.mongoOptions?.skip !== undefined)
       offset += this.mongoOptions.skip;
-    let answer:myTypes.ServerAnswer = {
+    let answer:myTypes.ServerAnswer = 
+    {
       status: "Success",
       queryResults:{
         resultCount: res.length,
@@ -137,31 +139,7 @@ export class SQLGetOperation extends SQLBaseOperation {
     };
     for(let result of res)
     {
-      await this.buildQuery();
-      if(this.collection === null)
-        throw new Error("Uninitialized mongoDB collection");
-      
-      let cursor = this.collection.find(this.queryValue, this.mongoOptions);
-      let res = await cursor.toArray();
-      let offset:number = res.length;
-      if(this.mongoOptions?.skip !== undefined)
-        offset += this.mongoOptions.skip;
-      let answer:myTypes.ServerAnswer = 
-      {
-        status: "Success",
-        queryResults:{
-          resultCount: res.length,
-          allResultsEnc: [],
-          allResultsClear: [],
-          pageToken: this.options.limit === res.length 
-            ? offset.toString() 
-            : undefined,
-        }
-      };
-      for(let result of res)
-      {
-        Object.keys(result).includes("object") ? answer.queryResults?.allResultsEnc?.push(result) : answer.queryResults?.allResultsClear?.push(result);
-      }
+      Object.keys(result).includes("object") ? answer.queryResults?.allResultsEnc?.push(result) : answer.queryResults?.allResultsClear?.push(result);
     }
     console.log(answer);
     return answer;

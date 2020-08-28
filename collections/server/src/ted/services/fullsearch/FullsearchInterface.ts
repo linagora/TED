@@ -35,7 +35,9 @@ export abstract class FullsearchInterface
 
     public abstract async search(query:Object, path:string):Promise<ServerSideObject[]>;
 
-    public abstract async update(obejct:ServerSideObject, schela:FullsearchSchema, path:string):Promise<void>;
+    public abstract async update(obejct:ServerSideObject, schema:FullsearchSchema, path:string):Promise<void>;
+
+    public abstract async delete(schema:FullsearchSchema, path:string):Promise<void>;
 
     public abstract async connect():Promise<void>;
 }

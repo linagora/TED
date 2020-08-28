@@ -1,16 +1,16 @@
-import ES from "@elastic/elasticsearch";
+import { Client } from "@elastic/elasticsearch";
 import { elasticSearch } from "../../../../../config/config";
 import { FullsearchInterface } from "../../FullsearchInterface";
 import { ServerSideObject, FullsearchSchema, InternalOperationDescription } from "../../../utils/myTypes";
 
 export class ESinterface extends FullsearchInterface
 {
-    client:ES.Client;
+    client:Client;
 
     constructor()
     {
         super();
-        this.client = new ES.Client({ node: elasticSearch.url });
+        this.client = new Client({ node: elasticSearch.url });
     }
 
     public async connect():Promise<void>
@@ -102,6 +102,16 @@ export class ESinterface extends FullsearchInterface
             }
             console.error(err);
         }
+    }
+
+    public async delete(schema:FullsearchSchema, path:string):Promise<void>
+    {
+        let indexName = this.getIndexName(path);
+        let ID = this.getObjectID(path);
+        await this.client.delete({
+            index: indexName,
+            id: ID,
+        });
     }
 
     protected async createIndex(schema:FullsearchSchema, path:string):Promise<void>
