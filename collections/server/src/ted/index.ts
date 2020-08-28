@@ -61,7 +61,7 @@ async function getHTTPBody(
             body_str = JSON.parse(temp_body_str);
           } catch (e) {
             body_str = {};
-            console.log(e);
+            console.error(e);
           }
           resolve(body_str);
         });
@@ -84,12 +84,8 @@ export async function main(_args: any): Promise<void> {
       err.message.match(/^Collection ([a-zA-z_]*) does not exist./)
     ) {
       console.log("TaskStore doesn't exist, nothing to fast forward.");
-      console.log(
-        err.message.match(/^Collection ([a-zA-z_]*) does not exist./)
-      );
       return;
     }
-    console.log("oups");
     throw err;
   });
 
@@ -111,7 +107,6 @@ export async function main(_args: any): Promise<void> {
     res: http.OutgoingMessage
   ) {
     try {
-      console.log("\n\n ===== New Incoming Request =====");
       let httpTimer = new Timer("http_response");
       let operation: myTypes.ServerRequest = await getHTTPBody(req);
       try {
@@ -123,7 +118,6 @@ export async function main(_args: any): Promise<void> {
         res.write(JSON.stringify(answer));
         res.end();
       } catch (err) {
-        console.log("catch2 \n", err);
         res.write('{"status":"' + err.toString() + '"}');
         res.end();
       }

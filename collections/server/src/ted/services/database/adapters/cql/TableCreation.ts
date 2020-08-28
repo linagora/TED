@@ -17,12 +17,12 @@ export async function createTable(
     config.configuration.cassandra.keyspace + "." + tableDefinition.name;
   try {
     if (runningTableCreation.isDone(tableDefinition.name)) {
-      console.log("table already created");
+      console.log("table already created : ", tableDefinition.name);
       await delay(5000);
       return;
     }
     if (runningTableCreation.isRunning(tableDefinition.name)) {
-      console.log("Waiting for creation of table ", tableDefinition.name);
+      console.log("Waiting for creation of table : ", tableDefinition.name);
       await runningTableCreation.waitTask(tableDefinition.name);
       return;
     }

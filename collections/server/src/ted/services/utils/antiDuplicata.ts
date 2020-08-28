@@ -60,8 +60,6 @@ export class TaskTable
             })
             this.promiseTable[task] = promise;
             this.resolver[task] = promiseExt;
-
-            console.log(this.taskCounter, " running table creations");
             await this.delayer();
             this.taskCounter++;
             return;

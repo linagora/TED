@@ -96,9 +96,8 @@ async function getPendingOperations(path: string): Promise<myTypes.DBentry[]>
       limit: config.configuration.ted.taskStoreBatchSize,
     },
   });
-  console.log("reading DB");
   let result = await getOperation.execute();
-  console.log("pending operation : ", result.queryResults);
+  //console.log("pending operations : ",   result.queryResults?.allResultsEnc?.map( (value) => JSON.parse(value["object"]) ));
 
   if (
     result.queryResults === undefined ||

@@ -22,12 +22,10 @@ export class TaskPrefetcher
     public async pushTask(task:Promise<void>):Promise<void>
     {
         let taskID:string = uuidv4();
-        console.log("Task ", taskID, " added to prefetecher");
         this.taskCounter +=1;
         this.tasks[taskID] = task;
         task.then( () => 
         {
-            console.log("Ended task : ", taskID);
             this.taskCounter -=1;
             delete this.tasks[taskID];
         });

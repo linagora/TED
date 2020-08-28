@@ -109,7 +109,7 @@ export class RabbitMQBroker extends TaskBroker {
         async (msg) => {
           if (msg === null) throw new Error("Received null from amqp");
           try {
-            console.log("New task : ", msg.content.toString("utf-8"));
+            console.log("New task from ", this.queueName, " : ", msg.content.toString("utf-8"));
             await Promise.race([
               this.callback(msg.content.toString("utf-8")),
               ineterruptPromise,
@@ -117,7 +117,9 @@ export class RabbitMQBroker extends TaskBroker {
             if (!this.running) throw interruptionError;
             console.log("End of task : ", msg.content.toString("utf-8"));
             this.channel?.ack(msg);
-          } catch (err) {
+          } 
+          catch (err) {
+            if(err === interruptionError) throw err;
             console.error(err);
             await delay(this.rejectionTimeout);
             this.channel?.reject(msg);
@@ -126,8 +128,9 @@ export class RabbitMQBroker extends TaskBroker {
         { noAck: false }
       );
     } catch (err) {
-      console.error("Unable to consume task from rabbitMQ");
-      throw err;
+      if(err !== interruptionError) console.error(err);
+      console.log("Socket connection interrupted, all running operations have been killed");
+      return;
     }
   }
 
@@ -191,7 +194,6 @@ export class SQSBroker extends TaskBroker {
               reject(err);
               return;
             }
-            console.log("pushed op sqs :", task);
             resolve();
             return;
           }
@@ -214,13 +216,12 @@ export class SQSBroker extends TaskBroker {
             try {
               if (err) reject(err);
               if (data.Messages === undefined) {
-                console.log("no message recieved");
                 await delay(1000);
                 resolve();
                 return;
               }
               let msg: SQS.Message = data.Messages[0];
-              console.log("New task : ", msg.Body);
+              console.log("New task from ", that.queueURL, " : ", msg.Body);
               if (msg.Body === undefined)
                 throw new Error("Received empty message");
               await Promise.race([that.callback(msg.Body), ineterruptPromise]);
@@ -274,8 +275,7 @@ export class SQSBroker extends TaskBroker {
         });
       }
     } catch (err) {
-      console.log("interruption error");
-      console.error(err);
+      console.log("Socket connection interrupted, all running operations have been killed");
       return;
     }
   }
@@ -292,7 +292,6 @@ export class SQSBroker extends TaskBroker {
               if (err) throw err;
               if (data.QueueUrl === undefined)
                 throw new Error("Undefined queue URL");
-              console.log(data.QueueUrl);
               that.queueURL = data.QueueUrl;
               resolve();
             }

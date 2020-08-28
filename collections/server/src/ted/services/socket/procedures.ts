@@ -25,15 +25,14 @@ export async function login(
     "sha512"
   );
   if (target.compare(hash) !== 0) {
-    //callback(new Error("Invalid password"), null);
     authTable[socket.id] = false;
     console.log(socket.id, " : authentication failed");
     socket.emit("loginFail");
-    await delay(100);
+    await delay(50);
     socket.disconnect(true);
-  } else {
+  } 
+  else {
     authTable[socket.id] = true;
-    //callback(null, "authentication successful")
     console.log(socket.id, " : authentication successful");
     socket.emit("loginSuccess");
   }

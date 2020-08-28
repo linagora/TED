@@ -16,34 +16,6 @@ import { SaveEventStore } from "../tedOperations/EventsTable";
 import { GetMainView } from "../tedOperations/MainProjections";
 import config from "../../services/configuration/configuration";
 
-export async function createOperation(
-  opDescriptor: myTypes.InternalOperationDescription
-): Promise<myTypes.GenericOperation> {
-  try {
-    //if((opDescriptor.collections === [] || opDescriptor.documents === []) && opDescriptor.action !== myTypes.action.batch) throw new Error("missing field path in request");
-    switch (opDescriptor.action) {
-      case myTypes.action.save: {
-        if (opDescriptor.encObject == undefined)
-          throw new Error("Encrypted object not created in save request");
-        return saveRoutine(opDescriptor);
-      }
-      case myTypes.action.get: {
-        return getRoutine(opDescriptor);
-      }
-      case myTypes.action.remove: {
-        return removeRoutine(opDescriptor);
-      }
-      default: {
-        throw new Error("Unknown action in request");
-      }
-    }
-  } catch (err) {
-    console.log("Responsible opDescriptor =\n", opDescriptor);
-    console.log("Failed to create operation: \n", err);
-    throw err;
-  }
-}
-
 export function getInternalOperationDescription(
   request: myTypes.ServerRequestBody,
   path: string,
@@ -74,7 +46,7 @@ export function getInternalOperationDescription(
           },
     afterTask: afterTask,
   };
-  console.log(opDescriptor);
+  console.log("\n ========== New request ==========\n", opDescriptor.action, " operation on ", path);
   return opDescriptor;
 }
 
@@ -101,6 +73,7 @@ export default async function handleRequest(
         if (mbInterface !== null)
           await mbInterface.pushTask(truncatePath(path), opDescriptor.opID);
         timer.stop();
+        console.log("Operation logged and added to the MQ");
         return { status: "Success" };
       }
       case myTypes.action.get: {
@@ -129,12 +102,13 @@ export async function logEvent(
   let enableIsolation = config.configuration.ted.dbCore !== "keyspace";
   let opWrite = new BatchOperation(
     [new SaveEventStore(opDescriptor), new SaveTaskStore(opDescriptor)],
-    false
+    enableIsolation
   );
   try {
     await opWrite.execute();
     timer.stop();
-  } catch (err) {
+  } 
+  catch (err) {
     console.error(err);
     if (err === tableCreationError) {
       await delay(1000);

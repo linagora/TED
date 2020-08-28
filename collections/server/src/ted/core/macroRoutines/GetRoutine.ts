@@ -7,6 +7,7 @@ import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
 import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
 import { buildPath } from "../../services/utils/divers";
 
+
 export let EmptyResultError = new Error("No matching object found");
 
 export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView>
@@ -28,7 +29,7 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     catch(err)
     {
         if(err === EmptyResultError) throw err;
-        console.log(err);
+        console.error(err);
         timer.stop();
         return new GetMainView(opDescriptor);
     }
@@ -51,6 +52,9 @@ async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription)
 
 function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, matchingIDs: string[]):GetMainView
 {
+    let options:myTypes.GetOptions = {};
+    if(opDescriptor.options !== undefined) options = opDescriptor.options as myTypes.GetOptions;
+
     let op = new GetMainView({
         action: myTypes.action.get,
         opID: opDescriptor.opID,
@@ -61,7 +65,11 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
                 key: opDescriptor.collections.slice(-1)[0],
                 value: matchingIDs,
                 operator: myTypes.Operator.in
-            }
+            },
+            limit: options.limit,
+            fullsearch: options.fullsearch,
+            order: options.order,
+            pageToken: options.pageToken,
         }
     });
     return op

@@ -38,7 +38,15 @@ export async function setup(httpsServer: http.Server): Promise<void> {
       await tedRequest(socket, data, callback);
     });
 
-    socket.on("sendTasks", (prefetchCount: number) => {
+    socket.on("sendTasks", (prefetchCount: number, callback) => {
+      if (!isAuth(socket)) {
+        let notAuthError = new Error("User not authentified");
+        notAuthError.name = "notAuthError";
+        callback(notAuthError, null);
+        console.log("Unauthorized socket is trying to access afterTasks");
+        return;
+      }
+      console.log("Access to afterTasks granted");
       sendTasks(socket, prefetchCount);
     });
 

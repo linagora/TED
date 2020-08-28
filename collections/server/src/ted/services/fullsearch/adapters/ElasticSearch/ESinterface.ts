@@ -31,7 +31,6 @@ export class ESinterface extends FullsearchInterface
         try
         {
             let object = this.buildObject(source_object, schema, path);
-            console.log(object);
             let indexName = this.getIndexName(path);
             let ID = this.getObjectID(path);
             await this.client.index({
@@ -58,7 +57,6 @@ export class ESinterface extends FullsearchInterface
             index: indexName,
             body:query,
         })
-        console.log(ans.body.hits.hits);
         let res:ServerSideObject[] = [];
         for(let hit of ans.body.hits.hits)
         {
@@ -69,7 +67,7 @@ export class ESinterface extends FullsearchInterface
             });
             res.push(tmp);
         }
-        console.log(res);
+        console.log(" Elasticsearch result :", res);
         return res;
     }
 
@@ -78,7 +76,6 @@ export class ESinterface extends FullsearchInterface
         try
         {
             let object = this.buildObject(source_object, schema, path);
-            console.log(object);
             let indexName = this.getIndexName(path);
             let ID = this.getObjectID(path);
             await this.client.update({
@@ -118,7 +115,6 @@ export class ESinterface extends FullsearchInterface
     {
         try
         {
-            console.log("Creating new index...");
             
             let indexName = this.getIndexName(path);
             let keys = Object.keys(this.getKeys(path));
@@ -139,17 +135,16 @@ export class ESinterface extends FullsearchInterface
             {
                 body["mappings"]["properties"]["key." + key] = { "type": "wildcard" };
             }
-            console.log(body);
+            console.log("Creating new index : ", body);
+
             await this.client.indices.create({
                 index: indexName,
                 body: body,
             });
-            console.log("Done");
         }
         catch(err)
         {
             console.error(err);
-            console.log(err.meta.body);
             throw err;
         }
         

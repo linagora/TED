@@ -113,15 +113,12 @@ export class SQLGetOperation extends SQLBaseOperation {
 
   public async execute():Promise<myTypes.ServerAnswer>
   {
-    console.log(this);
-
     await this.buildQuery();
     if(this.collection === null)
       throw new Error("Uninitialized mongoDB collection");
     
     let cursor = this.collection.find(this.queryValue, this.mongoOptions);
     let res = await cursor.toArray();
-    console.log(res)
     let offset:number = res.length;
     if(this.mongoOptions?.skip !== undefined)
       offset += this.mongoOptions.skip;
@@ -141,7 +138,6 @@ export class SQLGetOperation extends SQLBaseOperation {
     {
       Object.keys(result).includes("object") ? answer.queryResults?.allResultsEnc?.push(result) : answer.queryResults?.allResultsClear?.push(result);
     }
-    console.log(answer);
     return answer;
   }
 
