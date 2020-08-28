@@ -116,14 +116,14 @@ export class ESinterface extends FullsearchInterface
                 "mappings":{
                     "_source":{
                         "includes": ["key.*"],
-                        "excludes": ["document.*"]
+                        "excludes": ["value.*"]
                     },
                     "properties":{}
                 }
             };
             for(let pair of schema)
             {
-                body["mappings"]["properties"]["document." + pair.key] = { "type": pair.type };
+                body["mappings"]["properties"]["value." + pair.key] = { "type": pair.type };
             }
             for(let key of keys)
             {
@@ -150,7 +150,7 @@ export class ESinterface extends FullsearchInterface
         let res:ServerSideObject = {};
         for(let pair of schema)
         {
-            res["document."+pair.key] = object[pair.key];
+            res["value."+pair.key] = object[pair.key];
         }
         let keys = this.getKeys(path);
         Object.entries(keys).forEach(([key ,value]) => 
