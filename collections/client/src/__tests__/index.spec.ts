@@ -5,7 +5,7 @@ ted.configure({
   env: "dev",
   server: {
     http: "http://localhost:7250/",
-    socket: "ws://localhost:7250/",
+    socket: "ws://localhost:7252/",
   },
 });
 

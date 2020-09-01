@@ -1,5 +1,6 @@
 import Collection from "./RealTimeObject/Collection";
 import Document from "./RealTimeObject/Document";
+import { Websockets } from "./Websockets";
 
 type DBOptions = {
   env: "dev" | "prod";
@@ -14,10 +15,11 @@ export class TedClient {
     env: "prod",
     server: {
       http: "http://localhost:7250/",
-      socket: "ws://localhost:7251/",
+      socket: "ws://localhost:7252/",
     },
   };
 
+  sockets: Websockets | null = null;
   collections: { [key: string]: Collection } = {};
 
   /**
@@ -25,6 +27,7 @@ export class TedClient {
    */
   public configure(options: { [K in keyof DBOptions]?: DBOptions[K] }): void {
     this.configuration = Object.assign(this.configuration, options);
+    this.sockets = new Websockets(this);
   }
 
   /**

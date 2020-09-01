@@ -21,10 +21,10 @@ let nullSocketError = new Error("TED socket has been deleted.");
 export default class TEDServer {
   socket: SocketIOClient.Socket | null;
   salt: Buffer;
-  loginPromise:Promise<void>;
-  loginLock:ExternalResolver;
+  loginPromise: Promise<void>;
+  loginLock: ExternalResolver;
   after: AfterOperation;
-  first:boolean;
+  first: boolean;
 
   constructor(after: AfterOperation) {
     this.after = after;
@@ -32,20 +32,17 @@ export default class TEDServer {
     this.salt = Buffer.alloc(16);
     this.first = true;
 
-    let lock:ExternalResolver = {res:()=>{}, rej:()=>{}};
-    this.loginPromise = new Promise((resolve, reject) =>
-    {
+    let lock: ExternalResolver = { res: () => {}, rej: () => {} };
+    this.loginPromise = new Promise((resolve, reject) => {
       lock.res = resolve;
       lock.rej = reject;
     });
     this.loginLock = lock;
   }
 
-  private initLoginLock()
-  {
-    let lock:ExternalResolver = {res:()=>{}, rej:()=>{}};
-    this.loginPromise = new Promise((resolve, reject) =>
-    {
+  private initLoginLock() {
+    let lock: ExternalResolver = { res: () => {}, rej: () => {} };
+    this.loginPromise = new Promise((resolve, reject) => {
       lock.res = resolve;
       lock.rej = reject;
     });
@@ -73,7 +70,7 @@ export default class TEDServer {
 
     this.socket.on("disconnect", async (reason: string) => {
       that.initLoginLock();
-      console.log("disconnected");
+      console.log("disconnected", reason);
       await delay(1000);
       if (reason === "io server disconnect") {
         if (this.socket === null) throw nullSocketError;
@@ -141,16 +138,13 @@ export default class TEDServer {
     await this.loginPromise;
     console.log("getting tasks...");
 
-    this.socket?.emit("sendTasks", prefetch, async (err:any , data:any) =>
-    {
-      if(err !== null)
-      {
+    this.socket?.emit("sendTasks", prefetch, async (err: any, data: any) => {
+      if (err !== null) {
         console.error(err);
       }
     });
 
-    if(this.first)
-    {
+    if (this.first) {
       this.socket?.on("reconnect", () => {
         this.runTasks(prefetch);
       });
