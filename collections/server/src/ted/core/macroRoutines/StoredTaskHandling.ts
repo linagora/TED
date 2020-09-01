@@ -3,19 +3,23 @@ import config from "../../services/configuration/configuration";
 import * as messageBroker from "../../services/messageBroker/MessageBrokerInterface";
 import { GetTaskStore, RemoveTaskStore } from "../tedOperations/TaskStore";
 import { runWriteOperation } from "./RequestHandling";
-import { globalCounter } from "../../index";
 import { Timer } from "../../services/monitoring/Timer";
 import { tableCreationError } from "../../services/database/operations/baseOperations";
 import { delay, buildPath, processPath } from "../../services/utils/divers";
 import * as myCrypto from "../../services/utils/cryptographicTools";
 import { GetMainView } from "../tedOperations/MainProjections";
-import { sendToSocket } from "../../services/socket/sockectServer";
-import { Organizations } from "aws-sdk";
 
+
+//MB interface used to store projection tasks.
 export let mbInterface: messageBroker.TaskBroker | null;
+//MB interface used to send afterTasks.
 export let afterTaskSender: messageBroker.TaskBroker | null;
 
 export function setup(): void {
+  /**
+   * Setup both of the message queues according to configuration informations.
+   */
+
   switch (config.configuration.ted.broker) {
     case "RabbitMQ": {
       console.log("Intializing RabbitMQ interface");
@@ -71,16 +75,36 @@ export function setup(): void {
 }
 
 export async function projectTask(path: string): Promise<void> {
+  /**
+   * Callback for the projectionTasks interface.
+   * 
+   * When the projectionTasks interface gets a new message, this callback reads the TaskStore and runs the pending operations from the TaskStore.
+   * 
+   * @param {string} path The path to the collection that has pending operations.
+   * 
+   * @returns {Promise<void>} Resolves when the operations are done.
+   */
   let operations = await getPendingOperations(path);
   for (let op of operations) {
     await runPendingOperation(op, false);
   }
 }
 
+//Callback for the afterTasks interface (this interface never reads anything)
 async function dummyCallback(path: string): Promise<void> {}
 
 async function getPendingOperations(path: string): Promise<myTypes.DBentry[]>
 {
+  /**
+   * Reads the TaskStore to get the pending operations on a specified collection.
+   * 
+   * Gets no more operations than specified in the configuration, only on the given collection. Then returns a raw format of the operations, as they were stored in the TaskStore.
+   * 
+   * @param {string} path The path to the collection on which apply the operations.
+   * 
+   * @returns {Promise<myTypes.DBentry[>]} An array of raw operations.
+   */
+
   let timer = new Timer("taskstore_read");
   let processedPath = processPath(path);
   let getOperation = new GetTaskStore({
@@ -114,13 +138,31 @@ async function runPendingOperation(
   opLog: myTypes.DBentry,
   retry: boolean
 ): Promise<void> {
+  /**
+   * Runs a raw operation.
+   * 
+   * Runs an operation from a log stored on the TaskStore. Specifies if the operation needs to be retried in case of a table creation.
+   * 
+   * @param {myTypes.DBentry} opLog a log from the TaskStore.
+   * @param {boolean} retry Whether the operation should be retried if the table doesn't exist.
+   * 
+   * @returns {Promise<void>} Resolves when the operation ends on the DB.
+   */
+
   let timer = new Timer("projection");
   try {
+    //Parses the log.
     let opDescriptor: myTypes.InternalOperationDescription = JSON.parse(
       opLog.object
     );
+
+    //Runs the opeartion on the DB
     await runWriteOperation(opDescriptor);
+
+    //Emits an afterTask if needed
     sendToAfterTask(opDescriptor);
+    
+    //Removes the operation from the TaskStore.
     let rmDescriptor = { ...opDescriptor };
     rmDescriptor.keyOverride = {
       path: opLog.path,
@@ -129,10 +171,13 @@ async function runPendingOperation(
     let removeOperation = new RemoveTaskStore(rmDescriptor);
     let rmTimer = new Timer("taskstore_remove");
     await removeOperation.execute();
+
     rmTimer.stop();
     timer.stop();
   } catch (err) {
     timer.stop();
+
+    //If the table doesn't exist and the operation needs to be retried, wait and retry (for Amazon Keyspace)
     if (err === tableCreationError && retry) {
       await delay(10000);
       return runPendingOperation(opLog, true);
@@ -143,8 +188,19 @@ async function runPendingOperation(
 export async function forwardCollection(
   opDescriptor: myTypes.InternalOperationDescription
 ): Promise<void> {
+  /**
+   * Runs all the pending operations on a collection.
+   * 
+   * Receives an operation description, reads and then runs all the pending operations on the collection concerned by the operation description.
+   * 
+   * @param {myTypes.InternalOperationDescription} opDescriptor The operation that needs a collection forwarding.
+   * 
+   * @returns {Promise<void>} Resolves when the collection is up to date.
+   */
+
   try {
     let timer = new Timer("collection_forwarding");
+
     let path: string = buildPath(
       opDescriptor.collections,
       opDescriptor.documents,
@@ -152,6 +208,8 @@ export async function forwardCollection(
     );
     console.log("collection to forward", path);
     let operationsToForward: myTypes.DBentry[];
+
+    //While there are some pending operations, runs them.
     do {
       operationsToForward = await getPendingOperations(path);
       for (let op of operationsToForward) {
@@ -165,6 +223,11 @@ export async function forwardCollection(
 }
 
 async function getAllOperations(): Promise<myTypes.DBentry[]> {
+  /**
+   * Returns all the pending operations in the TaskStore. Used when recovering from a crash or rebooting.
+   * 
+   * @returns {Promise<myTypes.DBentry[]>} An array with the logs of all the pending operations.
+   */
   let timer = new Timer("taskstore_read");
   let getOperation = new GetTaskStore({
     action: myTypes.action.get,
@@ -188,6 +251,12 @@ async function getAllOperations(): Promise<myTypes.DBentry[]> {
 }
 
 export async function fastForwardTaskStore(): Promise<void> {
+  /**
+   * Pushes all the pending operations in the TaskStore to th projectionTasks MQ. Used when recovering from a crash or rebooting.
+   * 
+   * @returns {Promise<void>} Resolves when the TaskStore is empty.
+   */
+
   let allOps = await getAllOperations();
   if (mbInterface === null) {
     console.log(
@@ -211,10 +280,24 @@ export async function fastForwardTaskStore(): Promise<void> {
 export async function sendToAfterTask(
   opDescriptor: myTypes.InternalOperationDescription
 ): Promise<void> {
+  /**
+   * Pushes a task to the afterTasks MQ.
+   * 
+   * Once an operation is done, pushes the operation result to the afterTasks MQ according to the operation description.
+   * 
+   * @param {myTypes.InternalOperationDescription} opDescriptor The operation to push in the afterTask Queue.
+   * 
+   * @returns {Promise<void>} Resolves when the operation is pushed.
+   */
+
   return new Promise(async (resolve, reject) => {
     try {
+
+      //Case 1 : the operation doesn't need an afterTask
       if (opDescriptor.afterTask == !true) resolve();
-      else {
+
+      else 
+      {
         let getOp = new GetMainView({
           action: myTypes.action.get,
           opID: opDescriptor.opID,
@@ -223,10 +306,13 @@ export async function sendToAfterTask(
         });
         let res = await getOp.execute();
         myCrypto.decryptResult(res, myCrypto.globalKey);
+
+        //Case 2 : there is a result to send with the afterTask
         if (
           res.queryResults !== undefined &&
           res.queryResults?.resultCount > 0
-        ) {
+        ) 
+        {
           if (res.queryResults?.allResultsClear === undefined)
             throw new Error("Unable to find the created object");
           let ans: myTypes.AfterTask = {
@@ -244,7 +330,11 @@ export async function sendToAfterTask(
             opDescriptor.opID
           );
           resolve();
-        } else {
+        }
+
+        //Case 3 : there is no object to return with the afterTask
+        else 
+        {
           let ans: myTypes.AfterTask = {
             action: opDescriptor.action,
             path: buildPath(
