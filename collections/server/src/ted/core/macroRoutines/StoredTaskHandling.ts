@@ -15,10 +15,10 @@ export let mbInterface: messageBroker.TaskBroker | null;
 //MB interface used to send afterTasks.
 export let afterTaskSender: messageBroker.TaskBroker | null;
 
+/**
+ * Setup both of the message queues according to configuration informations.
+ */
 export function setup(): void {
-  /**
-   * Setup both of the message queues according to configuration informations.
-   */
 
   switch (config.configuration.ted.broker) {
     case "RabbitMQ": {
@@ -74,16 +74,17 @@ export function setup(): void {
   }
 }
 
+/**
+ * Callback for the projectionTasks interface.
+ * 
+ * When the projectionTasks interface gets a new message, this callback reads the TaskStore and runs the pending operations from the TaskStore.
+ * 
+ * @param {string} path The path to the collection that has pending operations.
+ * 
+ * @returns {Promise<void>} Resolves when the operations are done.
+ */
 export async function projectTask(path: string): Promise<void> {
-  /**
-   * Callback for the projectionTasks interface.
-   * 
-   * When the projectionTasks interface gets a new message, this callback reads the TaskStore and runs the pending operations from the TaskStore.
-   * 
-   * @param {string} path The path to the collection that has pending operations.
-   * 
-   * @returns {Promise<void>} Resolves when the operations are done.
-   */
+  
   let operations = await getPendingOperations(path);
   for (let op of operations) {
     await runPendingOperation(op, false);
@@ -93,17 +94,17 @@ export async function projectTask(path: string): Promise<void> {
 //Callback for the afterTasks interface (this interface never reads anything)
 async function dummyCallback(path: string): Promise<void> {}
 
+/**
+ * Reads the TaskStore to get the pending operations on a specified collection.
+ * 
+ * Gets no more operations than specified in the configuration, only on the given collection. Then returns a raw format of the operations, as they were stored in the TaskStore.
+ * 
+ * @param {string} path The path to the collection on which apply the operations.
+ * 
+ * @returns {Promise<myTypes.DBentry[>]} An array of raw operations.
+ */
 async function getPendingOperations(path: string): Promise<myTypes.DBentry[]>
 {
-  /**
-   * Reads the TaskStore to get the pending operations on a specified collection.
-   * 
-   * Gets no more operations than specified in the configuration, only on the given collection. Then returns a raw format of the operations, as they were stored in the TaskStore.
-   * 
-   * @param {string} path The path to the collection on which apply the operations.
-   * 
-   * @returns {Promise<myTypes.DBentry[>]} An array of raw operations.
-   */
 
   let timer = new Timer("taskstore_read");
   let processedPath = processPath(path);
@@ -134,21 +135,21 @@ async function getPendingOperations(path: string): Promise<myTypes.DBentry[]>
   return result.queryResults.allResultsEnc;
 }
 
+/**
+ * Runs a raw operation.
+ * 
+ * Runs an operation from a log stored on the TaskStore. Specifies if the operation needs to be retried in case of a table creation.
+ * 
+ * @param {myTypes.DBentry} opLog a log from the TaskStore.
+ * @param {boolean} retry Whether the operation should be retried if the table doesn't exist.
+ * 
+ * @returns {Promise<void>} Resolves when the operation ends on the DB.
+ */
 async function runPendingOperation(
   opLog: myTypes.DBentry,
   retry: boolean
 ): Promise<void> {
-  /**
-   * Runs a raw operation.
-   * 
-   * Runs an operation from a log stored on the TaskStore. Specifies if the operation needs to be retried in case of a table creation.
-   * 
-   * @param {myTypes.DBentry} opLog a log from the TaskStore.
-   * @param {boolean} retry Whether the operation should be retried if the table doesn't exist.
-   * 
-   * @returns {Promise<void>} Resolves when the operation ends on the DB.
-   */
-
+  
   let timer = new Timer("projection");
   try {
     //Parses the log.
@@ -185,19 +186,19 @@ async function runPendingOperation(
   }
 }
 
+/**
+ * Runs all the pending operations on a collection.
+ * 
+ * Receives an operation description, reads and then runs all the pending operations on the collection concerned by the operation description.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The operation that needs a collection forwarding.
+ * 
+ * @returns {Promise<void>} Resolves when the collection is up to date.
+ */
 export async function forwardCollection(
   opDescriptor: myTypes.InternalOperationDescription
 ): Promise<void> {
-  /**
-   * Runs all the pending operations on a collection.
-   * 
-   * Receives an operation description, reads and then runs all the pending operations on the collection concerned by the operation description.
-   * 
-   * @param {myTypes.InternalOperationDescription} opDescriptor The operation that needs a collection forwarding.
-   * 
-   * @returns {Promise<void>} Resolves when the collection is up to date.
-   */
-
+  
   try {
     let timer = new Timer("collection_forwarding");
 
@@ -222,12 +223,13 @@ export async function forwardCollection(
   } catch (err) {}
 }
 
+/**
+ * Returns all the pending operations in the TaskStore. Used when recovering from a crash or rebooting.
+ * 
+ * @returns {Promise<myTypes.DBentry[]>} An array with the logs of all the pending operations.
+ */
 async function getAllOperations(): Promise<myTypes.DBentry[]> {
-  /**
-   * Returns all the pending operations in the TaskStore. Used when recovering from a crash or rebooting.
-   * 
-   * @returns {Promise<myTypes.DBentry[]>} An array with the logs of all the pending operations.
-   */
+  
   let timer = new Timer("taskstore_read");
   let getOperation = new GetTaskStore({
     action: myTypes.action.get,
@@ -250,13 +252,13 @@ async function getAllOperations(): Promise<myTypes.DBentry[]> {
   return result.queryResults.allResultsEnc;
 }
 
+/**
+ * Pushes all the pending operations in the TaskStore to th projectionTasks MQ. Used when recovering from a crash or rebooting.
+ * 
+ * @returns {Promise<void>} Resolves when the TaskStore is empty.
+ */
 export async function fastForwardTaskStore(): Promise<void> {
-  /**
-   * Pushes all the pending operations in the TaskStore to th projectionTasks MQ. Used when recovering from a crash or rebooting.
-   * 
-   * @returns {Promise<void>} Resolves when the TaskStore is empty.
-   */
-
+  
   let allOps = await getAllOperations();
   if (mbInterface === null) {
     console.log(
@@ -277,19 +279,19 @@ export async function fastForwardTaskStore(): Promise<void> {
   }
 }
 
+/**
+ * Pushes a task to the afterTasks MQ.
+ * 
+ * Once an operation is done, pushes the operation result to the afterTasks MQ according to the operation description.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The operation to push in the afterTask Queue.
+ * 
+ * @returns {Promise<void>} Resolves when the operation is pushed.
+ */
 export async function sendToAfterTask(
   opDescriptor: myTypes.InternalOperationDescription
 ): Promise<void> {
-  /**
-   * Pushes a task to the afterTasks MQ.
-   * 
-   * Once an operation is done, pushes the operation result to the afterTasks MQ according to the operation description.
-   * 
-   * @param {myTypes.InternalOperationDescription} opDescriptor The operation to push in the afterTask Queue.
-   * 
-   * @returns {Promise<void>} Resolves when the operation is pushed.
-   */
-
+  
   return new Promise(async (resolve, reject) => {
     try {
 

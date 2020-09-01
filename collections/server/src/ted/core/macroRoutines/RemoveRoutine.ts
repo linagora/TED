@@ -8,18 +8,17 @@ import { TStoCQLtypes, getRemoveSecondaryView, createSecondaryInfos } from "../t
 import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
 import { buildPath } from "../../services/utils/divers";
 
+/**
+ * Computes a MainView remove operation based on a remove request.
+ * 
+ * Handles every possible case for a remove operation, computes the eventual secondary operations, and returns a Batch operation which will apply all the desired mofications on TED.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
+ * 
+ * @returns {Promise<BatchOperation>} A Batch with remove operations on both MainView and secondary tables.
+ */
 export default async function removeRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<BatchOperation>
 {
-    /**
-     * Computes a MainView remove operation based on a remove request.
-     * 
-     * Handles every possible case for a remove operation, computes the eventual secondary operations, and returns a Batch operation which will apply all the desired mofications on TED.
-     * 
-     * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
-     * 
-     * @returns {Promise<BatchOperation>} A Batch with remove operations on both MainView and secondary tables.
-     */
-
     globalCounter.inc("remove_precompute");
     let timer = new Timer("remove_precompute");
 
@@ -67,17 +66,17 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
     return new BatchOperation(opArray, false);
 }
 
+/**
+ * Deletes a document from the fullsearch index.
+ * 
+ * Runs a remove operation on the fullsearch core, based on the document path and on the scheme of the collection.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The original remove request.
+ * 
+ * @returns {Promise<void>} Resolves when the documents is removed.
+ */
 async function deleteFullsearch(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    /**
-     * Deletes a document from the fullsearch index.
-     * 
-     * Runs a remove operation on the fullsearch core, based on the document path and on the scheme of the collection.
-     * 
-     * @param {myTypes.InternalOperationDescription} opDescriptor The original remove request.
-     * 
-     * @returns {Promise<void>} Resolves when the documents is removed.
-     */
     if(opDescriptor.schema === undefined || opDescriptor.schema.fullsearchIndex === undefined) throw new Error("missing schema to index object");
     let path = buildPath(opDescriptor.collections, opDescriptor.documents, false);
     return fullsearchInterface.delete(opDescriptor.schema.fullsearchIndex, path);
