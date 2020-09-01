@@ -1,5 +1,4 @@
 import * as http from "http";
-import * as https from "https";
 import handleRequest from "./core/macroRoutines/RequestHandling";
 import * as myTypes from "./services/utils/myTypes";
 import {
@@ -106,7 +105,7 @@ export async function main(_args: any): Promise<void> {
   metricServer.listen(7251);
 
   console.log("Initializing socket server on 7250");
-  let httpServer = https.createServer({}, async function (
+  let httpServer = http.createServer({}, async function (
     req: http.IncomingMessage,
     res: http.OutgoingMessage
   ) {
