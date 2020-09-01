@@ -6,18 +6,19 @@ import { GetMainView } from "../tedOperations/MainProjections";
 import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
 import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
 import { buildPath } from "../../services/utils/divers";
+import { ted } from "../../../config/config";
 
 
 export let EmptyResultError = new Error("No matching object found");
 
-export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView>
+export default async function getRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView|GetMainView[]>
 {
     /**
      * Computes a MainView read operation based on a read request.
      * 
      * Handles every possible case for a read operation (except the fullsearch which has been catched higher), runs the eventual secondary operations (collection forwarding, secondary reading), and returns a Get operation on the MainView which will return the desired result(s).
      * 
-     * @param {myTypes.InternalOperationDescription} var The description of the request that needs to be handled.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
      * 
      * @returns {Promise<GetMainView>} A MainView read operation, returning the results asked by the request.
      */
@@ -40,10 +41,10 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
 
         //Case 3 : the query is a "Where" query on the collection 
             //=> get the UUIDs of the documents matching the query and then read them on MainView
-        let matchingIDs:string[] = await getMatchingIDs(opDescriptor);
+        let [matchingIDs, pageToken] = await getMatchingIDs(opDescriptor);
         timer.stop();
         if(matchingIDs.length === 0) throw EmptyResultError;
-        let op = buildGetOperation(opDescriptor, matchingIDs);
+        let op = buildGetOperation(opDescriptor, matchingIDs, pageToken);
         return op;
     }
     catch(err)
@@ -56,14 +57,14 @@ export default async function getRequest(opDescriptor:myTypes.InternalOperationD
     }
 }
 
-async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription):Promise<string[]>
+async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription):Promise<[string[],string?]>
 {
     /**
      * Compute a list of all the documents of a collection matching a "Where" clause.
      * 
      * Compute a string array containing the UUIDs of all the documents of a collection matching a "Where" clause on a single indexed field.
      * 
-     * @param {myTypes.InternalOperationDescription} var Description of the request that requires a search on the secondary tables.
+     * @param {myTypes.InternalOperationDescription} opDescriptor Description of the request that requires a search on the secondary tables.
      * 
      * @returns {Promise<string[]>} An array containing the UUIDs of all the matching documents.
      */
@@ -71,6 +72,7 @@ async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription)
     //Querying all the matching result on the secondary table
     let secondaryOp = getGetSecondaryView(opDescriptor);
     let result:myTypes.ServerAnswer = await secondaryOp.execute();
+    console.log(result.queryResults);
 
     //Formating the result with only the desired UUIDs
     let objectKey:string = opDescriptor.collections.slice(-1)[0];
@@ -81,18 +83,18 @@ async function getMatchingIDs(opDescriptor:myTypes.InternalOperationDescription)
     {
         matchingIDs.push(object[objectKey] as string);
     }
-    return matchingIDs;        
+    return [matchingIDs, result.queryResults.pageToken];        
 }
 
-function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, matchingIDs: string[]):GetMainView
+function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, matchingIDs: string[], pageToken?:string):GetMainView|GetMainView[]
 {
     /**
      * Builds a MainView read operation from an UUIDs array.
      * 
      * Uses the matching UUIDs from the previous function, and a read request description to build a GetMainView operation.
      * 
-     * @param {myTypes.InternalOperationDescription} var The description of the original request.
-     * @param {string[]} var A list of all the documents to retrieve from the collection.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The description of the original request.
+     * @param {string[]} matchingIDs A list of all the documents to retrieve from the collection.
      * 
      * @returns {GetMainView} A MainView read operation which returns all the documents from the array.
      */
@@ -101,24 +103,45 @@ function buildGetOperation(opDescriptor:myTypes.InternalOperationDescription, ma
     let options:myTypes.GetOptions = {};
     if(opDescriptor.options !== undefined) options = opDescriptor.options as myTypes.GetOptions;
 
-    let op = new GetMainView({
-        action: myTypes.action.get,
-        opID: opDescriptor.opID,
-        documents: opDescriptor.documents,
-        collections: opDescriptor.collections,
-        options: {
-            where:{
-                key: opDescriptor.collections.slice(-1)[0],
-                value: matchingIDs,
-                operator: myTypes.Operator.in
-            },
-            limit: options.limit,
-            fullsearch: options.fullsearch,
-            order: options.order,
-            pageToken: options.pageToken,
+    if(ted.dbCore !== "keyspace")
+    {
+        let op = new GetMainView({
+            action: myTypes.action.get,
+            opID: opDescriptor.opID,
+            documents: opDescriptor.documents,
+            collections: opDescriptor.collections,
+            options: {
+                where:{
+                    key: opDescriptor.collections.slice(-1)[0],
+                    value: matchingIDs,
+                    operator: myTypes.Operator.in
+                },
+            }
+        }, pageToken);
+        return op;
+    }
+
+    else
+    {
+        let res:GetMainView[] = [];
+        for(let doc of matchingIDs)
+        {
+            res.push(new GetMainView({
+                action: myTypes.action.get,
+                opID: opDescriptor.opID,
+                documents: opDescriptor.documents,
+                collections: opDescriptor.collections,
+                options: {
+                    where:{
+                        key: opDescriptor.collections.slice(-1)[0],
+                        value: doc,
+                        operator: myTypes.Operator.eq
+                    },
+                }
+            }, pageToken));
         }
-    });
-    return op
+        return res;
+    }
 }
 
 export async function fullsearchRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<GetMainView[]>
@@ -128,7 +151,7 @@ export async function fullsearchRequest(opDescriptor:myTypes.InternalOperationDe
      * 
      * Runs a query on the fullsearch core in order to get the UUIDs matching the query. Then computes MainView read operations from the returned results.
      * 
-     * @param {myTypes.InternalOperationDescription} var The original request requiring a fullsearch query.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The original request requiring a fullsearch query.
      * 
      * @returns {Promise<GetMainView[]>} A MainView read operation for each document returned by the fullsearch (potentially on different collections). 
      */
@@ -143,8 +166,8 @@ function buildFullsearchGet(opDescriptor:myTypes.InternalOperationDescription, m
     /**
      * Computes GetMainView operations from a fullsearch resutls.
      * 
-     * @param {myTypes.InternalOperationDescription} var The original request requiring a fullsearch query.
-     * @param {myTypes.ServerSideObject[]} var An array of object containing the primaryKey of the documents to query.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The original request requiring a fullsearch query.
+     * @param {myTypes.ServerSideObject[]} matchingKeys An array of object containing the primaryKey of the documents to query.
      * 
      * @returns {GetMainView[]} A list of MainView read operations, returning each a document matching the fullsearch query.
      */

@@ -80,7 +80,7 @@ export async function projectTask(path: string): Promise<void> {
    * 
    * When the projectionTasks interface gets a new message, this callback reads the TaskStore and runs the pending operations from the TaskStore.
    * 
-   * @param {string} var The path to the collection that has pending operations.
+   * @param {string} path The path to the collection that has pending operations.
    * 
    * @returns {Promise<void>} Resolves when the operations are done.
    */
@@ -100,7 +100,7 @@ async function getPendingOperations(path: string): Promise<myTypes.DBentry[]>
    * 
    * Gets no more operations than specified in the configuration, only on the given collection. Then returns a raw format of the operations, as they were stored in the TaskStore.
    * 
-   * @param {string} var The path to the collection on which apply the operations.
+   * @param {string} path The path to the collection on which apply the operations.
    * 
    * @returns {Promise<myTypes.DBentry[>]} An array of raw operations.
    */
@@ -143,8 +143,8 @@ async function runPendingOperation(
    * 
    * Runs an operation from a log stored on the TaskStore. Specifies if the operation needs to be retried in case of a table creation.
    * 
-   * @param {myTypes.DBentry} var a log from the TaskStore.
-   * @param {boolean} var Whether the operation should be retried if the table doesn't exist.
+   * @param {myTypes.DBentry} opLog a log from the TaskStore.
+   * @param {boolean} retry Whether the operation should be retried if the table doesn't exist.
    * 
    * @returns {Promise<void>} Resolves when the operation ends on the DB.
    */
@@ -193,7 +193,7 @@ export async function forwardCollection(
    * 
    * Receives an operation description, reads and then runs all the pending operations on the collection concerned by the operation description.
    * 
-   * @param {myTypes.InternalOperationDescription} var The operation that needs a collection forwarding.
+   * @param {myTypes.InternalOperationDescription} opDescriptor The operation that needs a collection forwarding.
    * 
    * @returns {Promise<void>} Resolves when the collection is up to date.
    */
@@ -285,7 +285,7 @@ export async function sendToAfterTask(
    * 
    * Once an operation is done, pushes the operation result to the afterTasks MQ according to the operation description.
    * 
-   * @param {myTypes.InternalOperationDescription} var The operation to push in the afterTask Queue.
+   * @param {myTypes.InternalOperationDescription} opDescriptor The operation to push in the afterTask Queue.
    * 
    * @returns {Promise<void>} Resolves when the operation is pushed.
    */

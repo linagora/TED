@@ -15,7 +15,7 @@ export default async function removeRequest(opDescriptor:myTypes.InternalOperati
      * 
      * Handles every possible case for a remove operation, computes the eventual secondary operations, and returns a Batch operation which will apply all the desired mofications on TED.
      * 
-     * @param {myTypes.InternalOperationDescription} var The description of the request that needs to be handled.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
      * 
      * @returns {Promise<BatchOperation>} A Batch with remove operations on both MainView and secondary tables.
      */
@@ -74,7 +74,7 @@ async function deleteFullsearch(opDescriptor:myTypes.InternalOperationDescriptio
      * 
      * Runs a remove operation on the fullsearch core, based on the document path and on the scheme of the collection.
      * 
-     * @param {myTypes.InternalOperationDescription} var The original remove request.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The original remove request.
      * 
      * @returns {Promise<void>} Resolves when the documents is removed.
      */

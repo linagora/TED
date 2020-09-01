@@ -2,8 +2,20 @@ import * as myTypes from "../../services/utils/myTypes";
 import { createTable } from "../../services/database/operations/baseOperations";
 import { SaveOperation, tableCreationError } from "../../services/database/operations/baseOperations";
 
+
 export class SaveEventStore extends SaveOperation
 {
+  /**
+   * Represents a save operation on an EventStore.
+   * 
+   * Uses an existing operation description to build a log that will be stored in the appropriate EventStore.
+   * 
+   * @constructs SaveEventStore
+   * @augments SaveOperation
+   * 
+   * @param {myTypes.InternalOperationDescription} operation the operation to log in the EventStore.
+   */
+
   constructor(operation:myTypes.InternalOperationDescription)
   {
     super({
@@ -23,11 +35,14 @@ export class SaveEventStore extends SaveOperation
     let res = await super.execute()
     .catch(async (err:myTypes.CQLResponseError) =>
     {
+
+      //If the table doesn't exist, creates it and throws an error (cancel the operation, it will be retried after the table creation).
       if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
       {
         await this.createTable();
         throw tableCreationError;
-      } 
+      }
+      //Else returns the error as the DB response.
       console.error(err.message);
       return {status:"error", error:err.message};
     });

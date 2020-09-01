@@ -7,6 +7,7 @@ import { SaveTaskStore } from "../tedOperations/TaskStore";
 import {
   BatchOperation,
   tableCreationError,
+  GetOperation,
 } from "../../services/database/operations/baseOperations";
 import { mbInterface } from "./StoredTaskHandling";
 import { v1 as uuidv1 } from "uuid";
@@ -15,6 +16,8 @@ import { processPath, delay, truncatePath } from "../../services/utils/divers";
 import { SaveEventStore } from "../tedOperations/EventsTable";
 import { GetMainView } from "../tedOperations/MainProjections";
 import config from "../../services/configuration/configuration";
+import { isUndefined } from "lodash";
+import { resolve } from "path";
 
 
 export function getInternalOperationDescription(
@@ -27,9 +30,9 @@ export function getInternalOperationDescription(
    * 
    * Receives an external request an builds all the options, key and parameters required to run an operation on the DB.
    * 
-   * @param {myTypes.ServerRequestBody} var the external request body.
-   * @param {string} var the path of the operation.
-   * @param {boolean} [var] wether the operation needs an afterTask.
+   * @param {myTypes.ServerRequestBody} request the external request body.
+   * @param {string} path the path of the operation.
+   * @param {boolean} [afterTask] wether the operation needs an afterTask.
    * 
    * @returns {myTypes.InternalOperationDescription} the operation description in a standard format.
    */
@@ -73,9 +76,9 @@ export default async function handleRequest(
    * 
    * Runs the appropriated routine according to the request, and sends back the result.
    * 
-   * @param {myTypes.ServerRequestBody} var the external request body.
-   * @param {string} var the path of the operation.
-   * @param {boolean} [var] wether the operation needs an afterTask.
+   * @param {myTypes.ServerRequestBody} request the external request body.
+   * @param {string} path the path of the operation.
+   * @param {boolean} [afterTask] wether the operation needs an afterTask.
    * 
    * @returns {myTypes.ServerAnswer} the answer to send back.
    */
@@ -141,8 +144,8 @@ export async function logEvent(
    * 
    * Simultaneously writes the operation on both tables. If the database core permits it, both operations are made in isolation to make sure the DB remains coherent.
    * 
-   * @param {myTypes.InternalOperationDescription} var the operation to log.
-   * @param {Timer} [var] optionnal timer when the function is called recursively.
+   * @param {myTypes.InternalOperationDescription} opDescriptor the operation to log.
+   * @param {Timer} [timer] optionnal timer when the function is called recursively.
    * 
    * @returns {Promise<void>} Resolves when the operation is added to both tables.
    */
@@ -178,7 +181,7 @@ export async function runWriteOperation(
    * 
    * Computes all the secondary operations triggered by the given operation, and runs them all.
    * 
-   * @param {myTypes.InternalOperationDescription} var the operation description.
+   * @param {myTypes.InternalOperationDescription} opDescriptor the operation description.
    * 
    * @returns {Promise<void>} Resolve when all the modifications have been applied on the database.
    */
@@ -216,7 +219,7 @@ async function runReadOperation(opDescriptor:myTypes.InternalOperationDescriptio
    * 
    * Computes all the secondary request to ask to the DB and returns the result of the given request.
    * 
-   * @param {myTypes.InternalOperationDescription} var the request description.
+   * @param {myTypes.InternalOperationDescription} opDescriptor the request description.
    * 
    * @returns {myTypes.ServerAnswer} the result of the request.
    */
@@ -225,9 +228,33 @@ async function runReadOperation(opDescriptor:myTypes.InternalOperationDescriptio
   //Case 1 : standard query => GetRoutine
   if((opDescriptor.options as myTypes.GetOptions).fullsearch === undefined)
   {
-    let op = await getRoutine(opDescriptor);
-    let res = await op.execute();
-    return res;
+    let ops = await getRoutine(opDescriptor);
+    if(ops instanceof GetOperation)
+    {
+      let res = await ops.execute();
+      return res;
+    }
+    else
+    {
+      let encRes:myTypes.ServerSideObject[] = [];
+      let pageToken: string|undefined = undefined;
+      for(let op of ops)
+      {
+        let res = await op.execute();
+        if(res.queryResults !== undefined && res.queryResults.allResultsEnc !== undefined)
+        encRes = encRes.concat(res.queryResults.allResultsEnc);
+        if(res.queryResults !== undefined && res.queryResults.pageToken !== undefined)
+          pageToken = res.queryResults.pageToken;
+      }
+      return {
+        status: "success",
+        queryResults: {
+          resultCount: encRes.length,
+          allResultsEnc: encRes,
+          pageToken: pageToken,
+        }
+      };
+    }
   }
   //Case 2 : fullsearch query => custom routine
   else
@@ -260,7 +287,7 @@ function controlRequest(
    * 
    * Checks for incompatibilities between the parameters of the operation descritption.
    * 
-   * @param {myTypes.InternalOperationDescription} var the operation to check.
+   * @param {myTypes.InternalOperationDescription} opDescriptor the operation to check.
    * 
    * @returns {void} throws an error according to the issue found.
    */

@@ -58,9 +58,9 @@ export class SaveMainView extends SaveOperation
 
 export class GetMainView extends GetOperation
 {
-  constructor(request:myTypes.InternalOperationDescription)
+  constructor(request:myTypes.InternalOperationDescription, pageToken?:string)
   {
-    super(request);
+    super(request, pageToken);
     this.table = this.buildTableName();
     this.buildOperation();
   }
@@ -69,6 +69,7 @@ export class GetMainView extends GetOperation
   {
     let res = await super.execute();
     this.done();
+    console.log(res);
     return res;
   }
 

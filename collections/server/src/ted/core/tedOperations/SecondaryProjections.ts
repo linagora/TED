@@ -189,6 +189,8 @@ export function getSaveSecondaryView(operation:myTypes.InternalOperationDescript
 
 export function getGetSecondaryView(operation:myTypes.InternalOperationDescription, where?:myTypes.SecondaryInfos):GetSecondaryView
 {
+    let options:myTypes.GetOptions = {};
+    if(operation.options !== undefined) options = operation.options as myTypes.GetOptions;
     if(operation.secondaryInfos === undefined && where === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
     let op = new GetSecondaryView({
         action: myTypes.action.get,
@@ -196,6 +198,7 @@ export function getGetSecondaryView(operation:myTypes.InternalOperationDescripti
         collections: operation.collections,
         documents: operation.documents,
         secondaryInfos: where === undefined ? hashSecondaryInfos(operation.secondaryInfos as myTypes.SecondaryInfos) : hashSecondaryInfos(where),
+        options : options,
     });
     return op;
 }

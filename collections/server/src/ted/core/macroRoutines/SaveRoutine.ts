@@ -17,7 +17,7 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
      * 
      * Handles every possible case for a save operation, computes the eventual secondary operations, and returns a Batch operation which will apply all the desired mofications on TED.
      * 
-     * @param {myTypes.InternalOperationDescription} var The description of the request that needs to be handled.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
      * 
      * @returns {Promise<BatchOperation>} A Batch with save & remove operations on both MainView and secondary tables.
      */
@@ -99,7 +99,7 @@ async function updateFullsearch(opDescriptor:myTypes.InternalOperationDescriptio
     /**
      * Updates the value of an indexed doucment.
      * 
-     * @param {myTypes.InternalOperationDescription} var The original save request.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The original save request.
      * 
      * @returns {Promise<void>} Resolves once the document has been updated.
      */
@@ -117,7 +117,7 @@ async function indexFullsearch(opDescriptor:myTypes.InternalOperationDescription
     /**
      * Creates a new document in the fullsearch core.
      * 
-     * @param {myTypes.InternalOperationDescription} var The original save request.
+     * @param {myTypes.InternalOperationDescription} opDescriptor The original save request.
      * 
      * @returns {Promise<void>} Resolves once the document has been updated.
      */

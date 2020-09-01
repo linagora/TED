@@ -142,11 +142,23 @@ export abstract class SaveOperation extends BaseOperation {
 export abstract class GetOperation extends BaseOperation {
   options?: myTypes.GetOptions;
   pageToken?: string;
+  constResToken?:string;
 
-  constructor(request: myTypes.InternalOperationDescription) {
+  constructor(request: myTypes.InternalOperationDescription, pageToken?:string) {
     super(request);
     this.action = myTypes.action.get;
     this.options = request.options as myTypes.GetOptions;
+    this.constResToken = pageToken;
+  }
+
+  public async execute():Promise<myTypes.ServerAnswer>
+  {
+    let res = await super.execute();
+    if(this.constResToken !== undefined && res.queryResults !== undefined)
+    {
+      res.queryResults.pageToken = this.constResToken;
+    }
+    return res;
   }
 
   protected buildOperation(): void {
