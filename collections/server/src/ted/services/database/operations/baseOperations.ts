@@ -126,7 +126,7 @@ export abstract class BaseOperation implements myTypes.GenericOperation {
    */
   public abstract async createTable(): Promise<void>;
 
-  public abstract done():void;
+  public abstract done(): void;
 }
 
 export abstract class SaveOperation extends BaseOperation {
@@ -175,20 +175,21 @@ export abstract class SaveOperation extends BaseOperation {
 export abstract class GetOperation extends BaseOperation {
   options?: myTypes.GetOptions;
   pageToken?: string;
-  constResToken?:string;
+  constResToken?: string;
 
-  constructor(request: myTypes.InternalOperationDescription, pageToken?:string) {
+  constructor(
+    request: myTypes.InternalOperationDescription,
+    pageToken?: string
+  ) {
     super(request);
     this.action = myTypes.action.get;
     this.options = request.options as myTypes.GetOptions;
     this.constResToken = pageToken;
   }
 
-  public async execute():Promise<myTypes.ServerAnswer>
-  {
+  public async execute(): Promise<myTypes.ServerAnswer> {
     let res = await super.execute();
-    if(this.constResToken !== undefined && res.queryResults !== undefined)
-    {
+    if (this.constResToken !== undefined && res.queryResults !== undefined) {
       res.queryResults.pageToken = this.constResToken;
     }
     return res;
@@ -267,20 +268,22 @@ export class BatchOperation implements myTypes.GenericOperation {
 
   public async execute(): Promise<myTypes.ServerAnswer> {
     this.buildOperation();
-    if(this.operation === null) throw new Error("Error in batch, operation not built");
-    let res = await this.operation.execute()
-    .catch(async (err:myTypes.CQLResponseError) =>
-    {
-      if((err.code === 8704 
-        && err.message.substr(0,18) === "unconfigured table") 
-        || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
-      {
-        await this.createAllTables();
-        throw tableCreationError;
-      }
-      throw err;
-    });
-    this.operationsArray.map( (op) => op.done());
+    if (this.operation === null)
+      throw new Error("Error in batch, operation not built");
+    let res = await this.operation
+      .execute()
+      .catch(async (err: myTypes.CQLResponseError) => {
+        if (
+          (err.code === 8704 &&
+            err.message.substr(0, 18) === "unconfigured table") ||
+          err.message.match(/^Collection ([a-zA-z_]*) does not exist./)
+        ) {
+          await this.createAllTables();
+          throw tableCreationError;
+        }
+        throw err;
+      });
+    this.operationsArray.map((op) => op.done());
     return res;
   }
 

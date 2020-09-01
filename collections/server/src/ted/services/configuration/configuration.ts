@@ -35,9 +35,11 @@ class Configuration {
       url: "",
     },
 
+    elasticSearch: {},
+
     //=============== Redis config ===============
 
-    redisNamespace: "twake_collections",
+    redis: false,
 
     //=============== RabbitMQ config ===============
 

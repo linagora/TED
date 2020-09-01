@@ -15,6 +15,8 @@ import { setup as mongoSetup } from "./services/database/adapters/sql/MongoDBtoo
 import config from "./services/configuration/configuration";
 import { setup as fullsearchSetup } from "./services/fullsearch/FullsearchSetup";
 import * as promClient from "prom-client";
+import * as socketIO from "socket.io";
+import * as redisAdapter from "socket.io-redis";
 
 import { setup as setupSocketcluster } from "./services/socket/sockectServer";
 
@@ -89,7 +91,7 @@ export async function main(_args: any): Promise<void> {
     throw err;
   });
 
-  console.log("Initializing https server");
+  console.log("Initializing metrics server on 7251");
   let metricServer = http.createServer(async function (
     req: http.IncomingMessage,
     res: http.OutgoingMessage
@@ -102,6 +104,7 @@ export async function main(_args: any): Promise<void> {
   });
   metricServer.listen(7251);
 
+  console.log("Initializing socket server on 7250");
   let httpServer = http.createServer({}, async function (
     req: http.IncomingMessage,
     res: http.OutgoingMessage
@@ -124,9 +127,34 @@ export async function main(_args: any): Promise<void> {
       httpTimer.stop();
     } catch (err) {
       console.warn(err);
+      res.end();
     }
   });
   setupSocketcluster(httpServer);
   httpServer.listen(7250);
+
+  console.log("Initializing websocket server on 7252");
+  let websocketsHttpServer = http.createServer({}, async function (
+    _req: http.IncomingMessage,
+    res: http.OutgoingMessage
+  ) {
+    res.end();
+  });
+  const websocketsServer: socketIO.Server = require("socket.io")(
+    websocketsHttpServer
+  );
+  websocketsServer.on("connect", (socket) => {
+    //TODO manage sockets
+  });
+  if (config.configuration.redis) {
+    websocketsServer.adapter(
+      require("socket.io-redis")({
+        host: config.configuration.redis.host,
+        port: config.configuration.redis.port,
+      })
+    );
+  }
+  websocketsHttpServer.listen(7252);
+
   initTimer.stop();
 }
