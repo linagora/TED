@@ -9,6 +9,12 @@ export async function setup() {
     case "elasticsearch": {
       fullsearchInterface = new ESinterface();
       await fullsearchInterface.connect();
+      break;
+    }
+    default: {
+      console.log(
+        "Warning : running without fullsearch core, a fullsearch query will trigger errors."
+      );
     }
   }
 }
