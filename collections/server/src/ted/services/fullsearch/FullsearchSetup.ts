@@ -1,18 +1,14 @@
 import { FullsearchInterface } from "./FullsearchInterface";
 import { ESinterface } from "./adapters/ElasticSearch/ESinterface";
-import { ted } from "../../../config/config";
-import { fullsearchRequest } from "../../core/macroRoutines/GetRoutine";
+import configuration from "../configuration/configuration";
 
-export let fullsearchInterface:FullsearchInterface;
+export let fullsearchInterface: FullsearchInterface;
 
-export async function setup()
-{
-    switch(ted.fullsearch)
-    {
-        case "elasticsearch":
-        {
-            fullsearchInterface = new ESinterface();
-            await fullsearchInterface.connect();
-        }
+export async function setup() {
+  switch (configuration.configuration.ted.fullsearch) {
+    case "elasticsearch": {
+      fullsearchInterface = new ESinterface();
+      await fullsearchInterface.connect();
     }
+  }
 }

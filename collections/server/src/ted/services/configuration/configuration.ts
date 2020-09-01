@@ -35,6 +35,8 @@ class Configuration {
       url: "",
     },
 
+    elasticSearch: {},
+
     //=============== Redis config ===============
 
     redis: false,
