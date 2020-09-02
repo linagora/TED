@@ -10,17 +10,17 @@ import { buildPath } from "../../services/utils/divers";
 
 const noPreviousValue:Error = new Error("Unable to find a previous value");
 
+/**
+ * Computes a MainView save operation based on a save request.
+ * 
+ * Handles every possible case for a save operation, computes the eventual secondary operations, and returns a Batch operation which will apply all the desired mofications on TED.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
+ * 
+ * @returns {Promise<BatchOperation>} A Batch with save & remove operations on both MainView and secondary tables.
+ */
 export default async function saveRequest(opDescriptor:myTypes.InternalOperationDescription):Promise<BatchOperation>
 {
-    /**
-     * Computes a MainView save operation based on a save request.
-     * 
-     * Handles every possible case for a save operation, computes the eventual secondary operations, and returns a Batch operation which will apply all the desired mofications on TED.
-     * 
-     * @param {myTypes.InternalOperationDescription} opDescriptor The description of the request that needs to be handled.
-     * 
-     * @returns {Promise<BatchOperation>} A Batch with save & remove operations on both MainView and secondary tables.
-     */
 
     if(opDescriptor.clearObject === undefined && opDescriptor.encObject === undefined) throw new Error("missing object in save operation");
     if(opDescriptor.clearObject === undefined) opDescriptor.clearObject = myCrypto.decryptData(JSON.parse(opDescriptor.encObject as string), myCrypto.globalKey);
@@ -94,15 +94,15 @@ export default async function saveRequest(opDescriptor:myTypes.InternalOperation
     return new BatchOperation(opArray, false);
 }
 
+/**
+ * Updates the value of an indexed doucment.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The original save request.
+ * 
+ * @returns {Promise<void>} Resolves once the document has been updated.
+ */
 async function updateFullsearch(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    /**
-     * Updates the value of an indexed doucment.
-     * 
-     * @param {myTypes.InternalOperationDescription} opDescriptor The original save request.
-     * 
-     * @returns {Promise<void>} Resolves once the document has been updated.
-     */
     console.log(" => Updating index");
     
     if(opDescriptor.clearObject === undefined) throw new Error("missing object in index operation");
@@ -112,15 +112,15 @@ async function updateFullsearch(opDescriptor:myTypes.InternalOperationDescriptio
     
 }
 
+/**
+ * Creates a new document in the fullsearch core.
+ * 
+ * @param {myTypes.InternalOperationDescription} opDescriptor The original save request.
+ * 
+ * @returns {Promise<void>} Resolves once the document has been updated.
+ */
 async function indexFullsearch(opDescriptor:myTypes.InternalOperationDescription):Promise<void>
 {
-    /**
-     * Creates a new document in the fullsearch core.
-     * 
-     * @param {myTypes.InternalOperationDescription} opDescriptor The original save request.
-     * 
-     * @returns {Promise<void>} Resolves once the document has been updated.
-     */
     console.log(" => Indexing object");
     if(opDescriptor.clearObject === undefined) throw new Error("missing object in index operation");
     if(opDescriptor.schema === undefined || opDescriptor.schema.fullsearchIndex === undefined) throw new Error("missing schema to index object");

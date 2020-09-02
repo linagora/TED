@@ -2,20 +2,19 @@ import * as myTypes from "../../services/utils/myTypes";
 import { createTable } from "../../services/database/operations/baseOperations";
 import { SaveOperation, tableCreationError } from "../../services/database/operations/baseOperations";
 
-
+/**
+ * Represents a save operation on an EventStore.
+ * 
+ * Uses an existing operation description to build a log that will be stored in the appropriate EventStore.
+ * 
+ * @constructs SaveEventStore
+ * @augments SaveOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} operation the operation to log in the EventStore.
+ */
 export class SaveEventStore extends SaveOperation
 {
-  /**
-   * Represents a save operation on an EventStore.
-   * 
-   * Uses an existing operation description to build a log that will be stored in the appropriate EventStore.
-   * 
-   * @constructs SaveEventStore
-   * @augments SaveOperation
-   * 
-   * @param {myTypes.InternalOperationDescription} operation the operation to log in the EventStore.
-   */
-
+  
   constructor(operation:myTypes.InternalOperationDescription)
   {
     super({
@@ -59,11 +58,20 @@ export class SaveEventStore extends SaveOperation
 
   protected static createLog(operation:myTypes.InternalOperationDescription):string
   {
+    //Makes sure the clear object doesn't appear in the EventStore.
     let copy:myTypes.InternalOperationDescription = {...operation};
     delete copy.clearObject;
     return JSON.stringify(copy);
   }
 
+  /**
+   * Creates the object to store in the EventStore.
+   * 
+   * Creates a JSON object with a correct format. For instance if the path is key_1/uuid_1/key_2/uuid_2, it will return :
+   * { key_1: uuid_1, op_id: timeuuid, object: operation_log }.
+   * 
+   * @returns {myTypes.DBentry} the formatted object ready to be stored in the CQL table.
+   */
   protected buildEntry():myTypes.DBentry
   {
     try
@@ -83,8 +91,21 @@ export class SaveEventStore extends SaveOperation
     }
   }
 
+  /**
+   * Creates the EventStore table.
+   * 
+   * Initializes a table with fields :
+   * - [collection_names] : uuid;
+   * - op_id : timeuuid;
+   * - object : text;
+   * 
+   * The primary key is ([collection_names], op_id).
+   * 
+   * @returns {Promise<void>} Resolves when the table is created (except for Keyspace, whose tables are created asynchronously).
+   */
   public async createTable():Promise<void>
   {
+    
     let tableDefinition:myTypes.TableDefinition = {
       name: this.buildTableName(),
       keys : ["op_id", "object"],

@@ -149,7 +149,32 @@ export class CQLGetOperation extends CQLBaseOperation
       if(primaryKey.params.length > 0) res.push("AND");
       else res.push("WHERE");
       res.push(this.where.key);
-      res.push(this.where.operator);
+      switch(this.where.operator)
+      {
+        case myTypes.Operator.eq:
+          res.push("=");
+          break;
+        case myTypes.Operator.diff:
+          res.push("!=");
+          break;
+        case myTypes.Operator.geq:
+          res.push(">=");
+          break;
+        case myTypes.Operator.gt:
+          res.push(">");
+          break;
+        case myTypes.Operator.leq:
+          res.push("<=");
+          break;
+        case myTypes.Operator.lt:
+          res.push("<");
+          break;
+        case myTypes.Operator.in:
+          res.push("IN");
+          break;
+        default:
+          throw new Error("Oops not implemented yet");
+      }
       res.push("?");
       params.push(this.where.value);
     }
@@ -164,6 +189,8 @@ export class CQLGetOperation extends CQLBaseOperation
       }
       res = res.slice(0,-1);
     }
+    if(this.options !== undefined && this.options.where !== undefined)
+      res.push("ALLOW FILTERING");
     this.query = {query: res.join(" "), params: params};
   }
 };

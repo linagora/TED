@@ -8,7 +8,18 @@ import {
   RemoveOperation,
 } from "../../services/database/operations/baseOperations";
 
+/**
+ * Writes an operation on the TaskStore.
+ * 
+ * Logs an operation which must then be projected on the MainView and on the secondary tables.
+ * 
+ * @constructs SaveTaskStore
+ * @augments SaveOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} operation the operation to log.
+ */
 export class SaveTaskStore extends SaveOperation {
+
   constructor(operation: myTypes.InternalOperationDescription) {
     super({
       action: myTypes.action.save,
@@ -29,6 +40,7 @@ export class SaveTaskStore extends SaveOperation {
       .execute()
       .catch(async (err: myTypes.CQLResponseError) => {
         if (
+          //If the table doesn't exist, creates it and throws an error (cancel the operation, it will be retried after the table creation).
           (err.code === 8704 &&
             err.message.substr(0, 18) === "unconfigured table") ||
           err.message.match(/^Collection ([a-zA-z_]*) does not exist./)
@@ -71,6 +83,18 @@ export class SaveTaskStore extends SaveOperation {
     return "global_taskstore";
   }
 
+  /**
+   * Creates the TaskStore table.
+   * 
+   * Initializes a table with fields :
+   * - collection_path : string;
+   * - op_id : timeuuid;
+   * - object : text;
+   * 
+   * The primary key is (path, op_id).
+   * 
+   * @returns {Promise<void>} Resolves when the table is created (except for Keyspace, whose tables are created asynchronously).
+   */
   public async createTable(): Promise<void> {
     let tableDefinition: myTypes.TableDefinition = {
       name: this.buildTableName(),
@@ -82,6 +106,14 @@ export class SaveTaskStore extends SaveOperation {
   }
 }
 
+/**
+ * Reads an operation on the TaskStore.
+ * 
+ * @constructs GetTaskStore
+ * @augments GetOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} operation the description of the get operation.
+ */
 export class GetTaskStore extends GetOperation {
   keyOverride: myTypes.DBentry;
 
@@ -116,6 +148,14 @@ export class GetTaskStore extends GetOperation {
   public async createTable(): Promise<void> {}
 }
 
+/**
+ * Removes an operation from the TaskStore.
+ * 
+ * @constructs RemoveTaskStore
+ * @augments RemoveOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} operation the description of the operation.
+ */
 export class RemoveTaskStore extends RemoveOperation {
   keyOverride: myTypes.DBentry;
 

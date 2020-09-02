@@ -8,7 +8,16 @@ TStoCQLtypes.set("string", "text");
 TStoCQLtypes.set("number", "decimal");
 TStoCQLtypes.set("boolean", "Boolean");
 
-
+/**
+ * Writes an object on a secondary table.
+ * 
+ * Adds or replace a document UUID on a secondary table, indexed by the value of a specified field.
+ * 
+ * @constructs SaveSecondaryView
+ * @augments SaveOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} request the description of the save operation
+ */
 export class SaveSecondaryView extends SaveOperation
 {
     secondaryInfos:myTypes.SecondaryInfos;
@@ -28,6 +37,7 @@ export class SaveSecondaryView extends SaveOperation
         let res = await super.execute()
         .catch(async (err:myTypes.CQLResponseError) =>
         {
+            //If the table doesn't exist, creates it and throws an error (cancel the operation, it will be retried after the table creation).
             if((err.code === 8704 && err.message.substr(0,18) === "unconfigured table") || err.message.match(/^Collection ([a-zA-z_]*) does not exist./))
             {
                 await this.createTable();
@@ -47,6 +57,18 @@ export class SaveSecondaryView extends SaveOperation
         return super.buildTableName() + "__index_" + this.secondaryInfos.secondaryKey;
     }
 
+    /**
+     * Creates a secondary table.
+     * 
+     * Initializes a table with these fields :
+     * - [collection_names] : uuid;
+     * - field_to_index : value;
+     * - document_name : uuid;
+     * 
+     * The primary key is ( [collection_names]: uuid, field_to_index: value, document_name: uuid; ).
+     * 
+     * @returns {Promise<void>} Resolves when the table is created (except for Keyspace, whose tables are created asynchronously).
+     */
     public async createTable():Promise<void>
     {
         let tableDefinition:myTypes.TableDefinition = {
@@ -89,6 +111,16 @@ export class SaveSecondaryView extends SaveOperation
     }
 };
 
+/**
+ * Reads an object on a secondary table.
+ * 
+ * Finds all the document that matches a specified field value and returns their UUIDs.
+ * 
+ * @constructs GetSecondaryView
+ * @augments GetOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} request the description of the operation
+ */
 export class GetSecondaryView extends GetOperation
 {
     secondaryInfos:myTypes.SecondaryInfos;
@@ -98,8 +130,11 @@ export class GetSecondaryView extends GetOperation
         super(request);
         if(request.secondaryInfos === undefined) throw new Error("Missing secondary arguments to create secondary operation");
         this.secondaryInfos = request.secondaryInfos;
-        this.table = this.buildTableName();
-        this.buildOperation();
+        if(this.options === undefined) this.options = {};
+        if(request.secondaryInfos.secondaryValue !== null)
+            this.options.where = this.getWhere(request.secondaryInfos);        
+        this.table = this.buildTableName();        
+        this.buildOperation();        
     }
 
     public async execute():Promise<myTypes.ServerAnswer>
@@ -119,17 +154,35 @@ export class GetSecondaryView extends GetOperation
     protected buildEntry():myTypes.DBentry
     {
         let entry:myTypes.DBentry = {};
-        for(let i:number = 0; i<this.documents.length -1 ; i++)
+        for(let i:number = 0; i<this.collections.length -1 ; i++)
         {
             entry[this.collections[i]] = this.documents[i];
         }
-        entry[this.secondaryInfos.secondaryKey] = this.secondaryInfos.secondaryValue;
         return entry;
+    }
+
+    protected getWhere(secondaryInfos:myTypes.SecondaryInfos):myTypes.WhereClause
+    {
+        return {
+            key: secondaryInfos.secondaryKey,
+            value: secondaryInfos.secondaryValue,
+            operator: secondaryInfos.operator
+        };
     }
 
     public async createTable():Promise<void>{}
 };
 
+/**
+ * Remove an object from a secondary table.
+ * 
+ * Removes an object from a a secondary table with its value and its UUID.
+ * 
+ * @constructs RemoveSecondaryView
+ * @augments RemoveOperation
+ * 
+ * @param {myTypes.InternalOperationDescription} request the description of the operation
+ */
 export class RemoveSecondaryView extends RemoveOperation
 {
     secondaryInfos:myTypes.SecondaryInfos;
@@ -172,7 +225,12 @@ export class RemoveSecondaryView extends RemoveOperation
     public async createTable():Promise<void>{}
 };
 
-
+/**
+ * Computes a Save operation on a secondary table, from another operation and the name of the field.
+ * @param {myTypes.InternalOperationDescription} operation the operation that needs to store a value on a secondary table.
+ * @param {string} secondaryKey the field of the object that needs to be stored.
+ * @returns {SaveSecondaryView} the save operation on the secondary table.
+ */
 export function getSaveSecondaryView(operation:myTypes.InternalOperationDescription, secondaryKey:string):SaveSecondaryView
 {
     if(operation.clearObject === undefined) throw new Error("Missing object for a secondary index update");
@@ -186,7 +244,12 @@ export function getSaveSecondaryView(operation:myTypes.InternalOperationDescript
     });
     return op;
 }
-
+ /**
+  * Computes a Get operation on a secondary table, from another operation and the name of the field.
+  * @param {myTypes.InternalOperationDescription} operation the operation that needs to read a value on a secondary table.
+  * @param {myTypes.SecondaryInfos} where an optionnal filter to apply on the query. If not provided, ` operation ` must contain a secondaryInfos field.
+  * @returns {GetSecondaryView} the get operation on the secondary table.
+  */
 export function getGetSecondaryView(operation:myTypes.InternalOperationDescription, where?:myTypes.SecondaryInfos):GetSecondaryView
 {
     let options:myTypes.GetOptions = {};
@@ -203,6 +266,12 @@ export function getGetSecondaryView(operation:myTypes.InternalOperationDescripti
     return op;
 }
 
+ /**
+  * Computes a Remove operation on a secondary table, from another operation and the name of the field.
+  * @param {myTypes.InternalOperationDescription} operation the operation that needs to remove a value from a secondary table.
+  * @param {myTypes.SecondaryInfos} where an optionnal filter to apply on the query. If not provided, ` operation ` must contain a secondaryInfos field.
+  * @returns {RemoveSecondaryView} the remove operation on the secondary table.
+  */
 export function getRemoveSecondaryView(operation:myTypes.InternalOperationDescription, where?:myTypes.SecondaryInfos):RemoveSecondaryView
 {
     if(operation.secondaryInfos === undefined && where === undefined) throw new Error("Unable to find an object in a secondary table without a condition");
@@ -217,7 +286,13 @@ export function getRemoveSecondaryView(operation:myTypes.InternalOperationDescri
 }
 
 
-
+/**
+ * Compute a filter clause from an object, a field name and an operator.
+ * @param {myTypes.ServerSideObject} object the reference object, the value in the clause will be ` object[secondaryKey] `.
+ * @param {string} secondaryKey the field to use.
+ * @param {myTypes.Operator} operator the operator to use in the clause.
+ * @returns {myTypes.SecondaryInfos} the clause formatted correctly.
+ */
 export function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryKey:string, operator:myTypes.Operator = myTypes.Operator.eq):myTypes.SecondaryInfos
 {
     if(object[secondaryKey] === undefined) throw new Error("Secondary key doesn't exist in object");
@@ -236,8 +311,14 @@ export function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryK
     }
 }
 
+/**
+ * Hashes the value of a where clause (used for string only).
+ * @param {myTypes.WhereClause | myTypes.SecondaryInfos} object the clause whose value must be hashe.
+ * @returns {myTypes.SecondaryInfos} another clause with a hashed value.
+ */
 export function hashSecondaryInfos(object:myTypes.WhereClause | myTypes.SecondaryInfos):myTypes.SecondaryInfos
 {
+
     if(Object.keys(object).includes("key"))
     {
         let where = object as myTypes.WhereClause;

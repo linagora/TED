@@ -19,6 +19,7 @@ import {
 } from "../adapters/sql/SQLOperations";
 import { createTable as cqlCreateTable } from "./../adapters/cql/TableCreation";
 import { createTable as sqlCreateTable } from "./../adapters/sql/TableCreation";
+import { Orderer } from "../../utils/orderer";
 
 export const tableCreationError: Error = new Error(
   "Table creation needed, canceling operation"
@@ -59,14 +60,33 @@ export abstract class BaseOperation implements myTypes.GenericOperation {
     this.table = null;
   }
 
+  /**
+   * Builds the CQL/SQL operation.
+   * 
+   * Depending on the configuration, builds the operation and stores it as an attributes. The operation cannot be modified then, or this method must be executed again.
+   */
   protected abstract buildOperation(): void;
 
+  /**
+   * Runs the operation on the DB.
+   * 
+   * Executes the operation on the core depending on TED's configuration.
+   * 
+   * @returns {Promise<myTypes.ServerAnswer>} the DB core answer.
+   */
   public async execute(): Promise<myTypes.ServerAnswer> {
     if (this.operation === null)
       throw new Error("unable to execute CQL operation, query not built");
     return this.operation.execute();
   }
 
+  /**
+   * Computes a JSON object with the UUID needed to find the document/collection.
+   * 
+   * For a Get/Remove operation, computes all the informations needed to find the document/collection. For a Save operation bulds the object that will be stored in the DB.
+   * 
+   * @returns {myTypes.DBentry} the JSON object with collection names as keys, and UUID as values.
+   */
   protected buildEntry(): myTypes.DBentry {
     try {
       let entry: myTypes.DBentry = {};
@@ -81,6 +101,13 @@ export abstract class BaseOperation implements myTypes.GenericOperation {
     }
   }
 
+  /**
+   * Builds the table name according to the path.
+   * 
+   * Takes each collection name in the path and uses it to build a table with a name formated as : name1_name2_name3. Then adds a suffixe depending on the type of operation.
+   * 
+   * @returns {Promise<void>} Resolves when the table is created (except for Keyspace, whose tables are created asynchronously).
+   */
   public buildTableName(): string {
     let res: string[] = [];
     for (let i: number = 0; i < this.collections.length; i++) {
@@ -91,6 +118,13 @@ export abstract class BaseOperation implements myTypes.GenericOperation {
     return res.join("");
   }
 
+  /**
+   * Creates the table used by this operation.
+   * 
+   * This methods is implemented only in operations that are allowed to build tables. Otherwise it does nothing.
+   * 
+   * @returns {Promise<void>} Resolves when the table is created (except for Keyspace, whose tables are created asynchronously).
+   */
   public abstract async createTable(): Promise<void>;
 
   public abstract done(): void;
@@ -143,21 +177,30 @@ export abstract class GetOperation extends BaseOperation {
   options?: myTypes.GetOptions;
   pageToken?: string;
   constResToken?: string;
+  orderer?:Orderer;
 
   constructor(
     request: myTypes.InternalOperationDescription,
-    pageToken?: string
+    pageToken?: string,
+    order?:string[]
   ) {
     super(request);
     this.action = myTypes.action.get;
     this.options = request.options as myTypes.GetOptions;
     this.constResToken = pageToken;
+    if(order !== undefined) this.orderer = new Orderer(order);
   }
 
   public async execute(): Promise<myTypes.ServerAnswer> {
     let res = await super.execute();
     if (this.constResToken !== undefined && res.queryResults !== undefined) {
       res.queryResults.pageToken = this.constResToken;
+    }
+    if(this.orderer !== undefined
+      && res.queryResults !== undefined
+      && res.queryResults.allResultsEnc !== undefined)
+    {
+      res.queryResults.allResultsEnc = this.orderer.order(res.queryResults.allResultsEnc, this.collections.slice(-1)[0]);
     }
     return res;
   }

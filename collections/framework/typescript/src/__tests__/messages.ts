@@ -54,7 +54,8 @@ ted.schemas.add("company",{
     auteur:true,
     pouet:true,
     null:true,
-    piege:false
+    piege:false,
+    date:true,
   },
   wsPrivateKeys:{
     default:false
@@ -77,6 +78,7 @@ ted.schemas.add("company/channel",{
     pouet: true,
     null: true,
     piege: false,
+    date:true,
   },
   wsPrivateKeys: {
     default: false,

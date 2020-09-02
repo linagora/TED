@@ -90,6 +90,7 @@ export async function runDB(
   query: myTypes.Query,
   options?: myTypes.QueryOptions
 ): Promise<myTypes.ServerAnswer> {
+  
   try {
     let rs: any;
     options = {...options, ...defaultQueryOptions};
