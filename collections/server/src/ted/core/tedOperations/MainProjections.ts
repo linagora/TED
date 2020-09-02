@@ -94,9 +94,12 @@ export class SaveMainView extends SaveOperation
 export class GetMainView extends GetOperation
 {
   
-  constructor(request:myTypes.InternalOperationDescription, pageToken?:string)
+  constructor(request:myTypes.InternalOperationDescription, pageToken?:string, order?:string[])
   {
-    super(request, pageToken);
+    super(request, pageToken, order);
+    if (this.options?.order !== undefined
+      && !this.collections.includes(this.options.order.key))
+      delete this.options.order;
     this.table = this.buildTableName();
     this.buildOperation();
   }
@@ -105,7 +108,6 @@ export class GetMainView extends GetOperation
   {
     let res = await super.execute();
     this.done();
-    console.log(res);
     return res;
   }
 

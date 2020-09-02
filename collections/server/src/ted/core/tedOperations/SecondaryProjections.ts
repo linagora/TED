@@ -130,8 +130,11 @@ export class GetSecondaryView extends GetOperation
         super(request);
         if(request.secondaryInfos === undefined) throw new Error("Missing secondary arguments to create secondary operation");
         this.secondaryInfos = request.secondaryInfos;
-        this.table = this.buildTableName();
-        this.buildOperation();
+        if(this.options === undefined) this.options = {};
+        if(request.secondaryInfos.secondaryValue !== null)
+            this.options.where = this.getWhere(request.secondaryInfos);        
+        this.table = this.buildTableName();        
+        this.buildOperation();        
     }
 
     public async execute():Promise<myTypes.ServerAnswer>
@@ -151,12 +154,20 @@ export class GetSecondaryView extends GetOperation
     protected buildEntry():myTypes.DBentry
     {
         let entry:myTypes.DBentry = {};
-        for(let i:number = 0; i<this.documents.length -1 ; i++)
+        for(let i:number = 0; i<this.collections.length -1 ; i++)
         {
             entry[this.collections[i]] = this.documents[i];
         }
-        entry[this.secondaryInfos.secondaryKey] = this.secondaryInfos.secondaryValue;
         return entry;
+    }
+
+    protected getWhere(secondaryInfos:myTypes.SecondaryInfos):myTypes.WhereClause
+    {
+        return {
+            key: secondaryInfos.secondaryKey,
+            value: secondaryInfos.secondaryValue,
+            operator: secondaryInfos.operator
+        };
     }
 
     public async createTable():Promise<void>{}
@@ -307,6 +318,7 @@ export function createSecondaryInfos(object:myTypes.ServerSideObject, secondaryK
  */
 export function hashSecondaryInfos(object:myTypes.WhereClause | myTypes.SecondaryInfos):myTypes.SecondaryInfos
 {
+
     if(Object.keys(object).includes("key"))
     {
         let where = object as myTypes.WhereClause;

@@ -117,6 +117,7 @@ class Configuration {
       maxTableCreation: 2,
       enableMultiTableCreation: true,
       dbCore: "cassandra",
+      fullsearch:"elasticsearch",
     },
   };
 }

@@ -7,6 +7,7 @@ import { getGetSecondaryView } from "../tedOperations/SecondaryProjections";
 import { fullsearchInterface } from "../../services/fullsearch/FullsearchSetup";
 import { buildPath } from "../../services/utils/divers";
 import config from "../../services/configuration/configuration";
+import { getObjectWhere } from "../../../__tests__/unitTests";
 
 export let EmptyResultError = new Error("No matching object found");
 
@@ -34,25 +35,48 @@ export default async function getRequest(
   if (opDescriptor.collections.length === opDescriptor.documents.length)
     return new GetMainView(opDescriptor);
 
+  let options:myTypes.GetOptions = {};
+  if(opDescriptor.options !== undefined)
+    options = opDescriptor.options as myTypes.GetOptions;
+
   try {
     //Case 2 : the path specifies the collection, and no filter has been given
     //=> read all the collection
-    if (opDescriptor.secondaryInfos === undefined)
+    if (
+      opDescriptor.secondaryInfos === undefined 
+      && (
+        options.order === undefined
+        || opDescriptor.collections.includes(options.order.key))
+    )
       return new GetMainView(opDescriptor);
+    
+    //Case 3 : the query specifies an order on a secondary key
+    //=> get the ordered UUIDS, query the MainView and reorder the results
+    else if ( options.order !== undefined
+      && !opDescriptor.collections.includes(options.order.key))
+    {
+      let [orderedIDs, pageToken] = await getOrderedIDs(opDescriptor);
+      timer.stop();
+      if (orderedIDs.length === 0) throw EmptyResultError;
+      let op = buildGetOperation(opDescriptor, orderedIDs, pageToken, true);
+      return op;
+    }
 
-    //Case 3 : the query is a "Where" query on the collection
+    //Case 4 : the query is a "Where" query on the collection
     //=> get the UUIDs of the documents matching the query and then read them on MainView
-    let [matchingIDs, pageToken] = await getMatchingIDs(opDescriptor);
-    timer.stop();
-    if (matchingIDs.length === 0) throw EmptyResultError;
-    let op = buildGetOperation(opDescriptor, matchingIDs, pageToken);
-    return op;
+    else
+    {
+      let [matchingIDs, pageToken] = await getMatchingIDs(opDescriptor);
+      timer.stop();
+      if (matchingIDs.length === 0) throw EmptyResultError;
+      let op = buildGetOperation(opDescriptor, matchingIDs, pageToken);
+      return op;
+    }
   } catch (err) {
     //If there was no matching result to the query on the secondary tables, there is no need to return an operation and the error is used to jump directly to the answer.
     if (err === EmptyResultError) throw err;
-    console.error(err);
     timer.stop();
-    return new GetMainView(opDescriptor);
+    throw err;
   }
 }
 
@@ -72,8 +96,55 @@ async function getMatchingIDs(
   //Querying all the matching result on the secondary table
   let secondaryOp = getGetSecondaryView(opDescriptor);
   let result: myTypes.ServerAnswer = await secondaryOp.execute();
-  console.log(result.queryResults);
 
+  //Formating the result with only the desired UUIDs
+  let objectKey: string = opDescriptor.collections.slice(-1)[0];
+  let matchingIDs: string[] = [];
+
+  if (
+    result.queryResults === undefined ||
+    result.queryResults.allResultsClear === undefined
+  )
+    throw new Error(
+      "Unable to query requested fields : " + JSON.stringify(result)
+    );
+  for (let object of result.queryResults.allResultsClear) {
+    matchingIDs.push(object[objectKey] as string);
+  }
+  return [matchingIDs, result.queryResults.pageToken];
+}
+
+/**
+ * Compute a list of all the documents of a collection oredered according to the specified key.
+ *
+ * Compute a string array containing the ordered UUIDs of all the documents of a collection.
+ *
+ * @param {myTypes.InternalOperationDescription} opDescriptor Description of the request that requires a search on the secondary tables.
+ *
+ * @returns {Promise<string[]>} An array containing the oredered UUIDs of the documents.
+ */
+async function getOrderedIDs(
+  opDescriptor: myTypes.InternalOperationDescription
+): Promise<[string[], string?]> {
+    
+  let options:myTypes.GetOptions = {};
+  if(opDescriptor.options !== undefined)
+    options = opDescriptor.options as myTypes.GetOptions;
+
+  if(options.order === undefined)
+    throw new Error("Missing options to oreder results");
+  
+  //Querying all the matching result on the secondary table
+  let secondaryOp = getGetSecondaryView(opDescriptor, 
+    opDescriptor.secondaryInfos === undefined 
+    ? {
+      secondaryKey: options.order.key,
+      operator: myTypes.Operator.eq,
+      secondaryValue: null,
+    }
+    : opDescriptor.secondaryInfos );
+
+  let result: myTypes.ServerAnswer = await secondaryOp.execute();
   //Formating the result with only the desired UUIDs
   let objectKey: string = opDescriptor.collections.slice(-1)[0];
   let matchingIDs: string[] = [];
@@ -104,7 +175,8 @@ async function getMatchingIDs(
 function buildGetOperation(
   opDescriptor: myTypes.InternalOperationDescription,
   matchingIDs: string[],
-  pageToken?: string
+  pageToken?: string,
+  order?:boolean,
 ): GetMainView | GetMainView[] {
 
   //Copying the options into the returned operation.
@@ -127,7 +199,10 @@ function buildGetOperation(
           },
         },
       },
-      pageToken
+      pageToken,
+      order
+      ? matchingIDs
+      : undefined
     );
     return op;
   } else {

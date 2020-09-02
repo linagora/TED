@@ -19,6 +19,7 @@ import {
 } from "../adapters/sql/SQLOperations";
 import { createTable as cqlCreateTable } from "./../adapters/cql/TableCreation";
 import { createTable as sqlCreateTable } from "./../adapters/sql/TableCreation";
+import { Orderer } from "../../utils/orderer";
 
 export const tableCreationError: Error = new Error(
   "Table creation needed, canceling operation"
@@ -176,21 +177,30 @@ export abstract class GetOperation extends BaseOperation {
   options?: myTypes.GetOptions;
   pageToken?: string;
   constResToken?: string;
+  orderer?:Orderer;
 
   constructor(
     request: myTypes.InternalOperationDescription,
-    pageToken?: string
+    pageToken?: string,
+    order?:string[]
   ) {
     super(request);
     this.action = myTypes.action.get;
     this.options = request.options as myTypes.GetOptions;
     this.constResToken = pageToken;
+    if(order !== undefined) this.orderer = new Orderer(order);
   }
 
   public async execute(): Promise<myTypes.ServerAnswer> {
     let res = await super.execute();
     if (this.constResToken !== undefined && res.queryResults !== undefined) {
       res.queryResults.pageToken = this.constResToken;
+    }
+    if(this.orderer !== undefined
+      && res.queryResults !== undefined
+      && res.queryResults.allResultsEnc !== undefined)
+    {
+      res.queryResults.allResultsEnc = this.orderer.order(res.queryResults.allResultsEnc, this.collections.slice(-1)[0]);
     }
     return res;
   }
