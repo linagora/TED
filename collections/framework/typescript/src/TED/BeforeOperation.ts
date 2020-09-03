@@ -4,7 +4,7 @@ import { SaveRequest, GetRequest, RemoveRequest } from "./DB";
 export type BeforeProcess = (
   object: StringIndexedObject,
   request: any
-) => StringIndexedObject;
+) => StringIndexedObject | false;
 
 type BeforeProcessMap = {
   [path: string]: BeforeProcess;

@@ -40,6 +40,7 @@ export async function createTableRetry(
 ): Promise<void> {
   let tableTimer = new Timer("table_creation");
   let query = createTableQuery(tableDefinition);
+  console.log("will run ", query);
   await datastaxTools
     .runDB(query, {})
     .catch(async (err) => {
