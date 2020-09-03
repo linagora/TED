@@ -90,11 +90,14 @@ export async function runDB(
   query: myTypes.Query,
   options?: myTypes.QueryOptions
 ): Promise<myTypes.ServerAnswer> {
-  
   try {
     let rs: any;
-    options = {...options, ...defaultQueryOptions};
-    rs = await client.execute(query.query, query.params, options);
+    if (Object.keys(options || {}).length === 0 && query.params.length === 0) {
+      rs = await client.execute(query.query);
+    } else {
+      options = { ...options, ...defaultQueryOptions };
+      rs = await client.execute(query.query, query.params, options);
+    }
     return processResult(rs);
   } catch (err) {
     throw err;
@@ -157,9 +160,9 @@ function processResult(rs: any): myTypes.ServerAnswer {
       queryResults.allResultsClear.push(object);
     }
   }
-  if(rs.pageState !== null && rs.pageState !== undefined)
+  if (rs.pageState !== null && rs.pageState !== undefined)
     queryResults.pageToken = rs.pageState.toString();
-  return {status: "success", queryResults:queryResults};
+  return { status: "success", queryResults: queryResults };
 }
 
 export async function createKeyspace(

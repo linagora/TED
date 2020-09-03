@@ -11,25 +11,21 @@ import Schemas from "./TED/Schemas";
 import express from "express";
 import { Schema } from "inspector";
 
+export type StringIndexedObject = {
+  [key: string]: any;
+};
 
-export type StringIndexedObject =
-{
-  [key:string]:any;
-}
+export type HTTPSaveBody = {
+  object: StringIndexedObject;
+};
 
-export type HTTPSaveBody = 
-{
-  object:StringIndexedObject;
-}
-
-export type HTTPGetBody = 
-{
-  order?:Order;
-  limit?:number;
-  pageToken?:string;
-  where?:WhereClause;
-  fullsearch?:JSON;
-}
+export type HTTPGetBody = {
+  order?: Order;
+  limit?: number;
+  pageToken?: string;
+  where?: WhereClause;
+  fullsearch?: JSON;
+};
 type Order = {
   key: string;
   order: "ASC" | "DESC";
@@ -110,15 +106,14 @@ export default class TED {
       body: {
         action: "save",
         object: save.object,
-        schema:
-          this.schemas.schemas[collectionPath] !== undefined
-            ? this.schemas.get(collectionPath, save.object)
-            : undefined,
       },
       afterTask: after,
     };
-    console.log(path);
     tedRequest = await this.before.runSave(tedRequest, originalRequest);
+    tedRequest.body.schema =
+      this.schemas.schemas[collectionPath] !== undefined
+        ? this.schemas.get(collectionPath, tedRequest.body.object)
+        : undefined;
     let response = await this.db.save(tedRequest);
     return response;
   }
