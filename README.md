@@ -13,7 +13,7 @@ Read more about Twake collaborative workspace by Linagora on [https://twake.app]
 
 ## Get started
 
-Will start a MongoDB + TabbitMQ Ted server. If you want to configure Ted with Cassandra/Keyspaces or SQS, go to the complete documentation.
+Will start a MongoDB + RabbitMQ Ted server. If you want to configure Ted with Cassandra/Keyspaces or SQS, go to the complete documentation.
 
 #### 1. Go to the right directory
 
