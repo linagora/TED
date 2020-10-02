@@ -30,7 +30,7 @@
     "@types/socket.io-redis": "^1.0.26",
     "@types/uuid": "^8.0.0",
     "amqplib": "^0.6.0",
-    "aws-sdk": "^2.717.0",
+    "aws-sdk": "^2.750.0",
     "axios": "^0.19.2",
     "cassandra-driver": "^4.5.2",
     "deep-equal": "^2.0.3",
