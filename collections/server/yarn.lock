@@ -978,9 +978,10 @@ jmespath@0.15.0:
   version "0.15.0"
   resolved "https://registry.yarnpkg.com/jmespath/-/jmespath-0.15.0.tgz#a3f222a9aae9f966f5d27c796510e28091764217"
 
-js-base64@^2.6.2:
-  version "2.6.2"
-  resolved "https://registry.yarnpkg.com/js-base64/-/js-base64-2.6.2.tgz#cf9301bc5cc756892a9a6c8d7138322e5944fb0d"
+js-base64@^2.6.4:
+  version "2.6.4"
+  resolved "https://registry.yarnpkg.com/js-base64/-/js-base64-2.6.4.tgz#f4e686c5de1ea1f867dbcad3d46d969428df98c4"
+  integrity sha512-pZe//GGmwJndub7ZghVHz7vjb2LgC1m8B07Au3eYqeqv9emhESByMXxaEgkUkEqJe87oBbSniGYoQNIBklc7IQ==
 
 json-buffer@3.0.0:
   version "3.0.0"
