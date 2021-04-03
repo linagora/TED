@@ -35,7 +35,7 @@
     "typescript": "^3.9.5"
   },
   "dependencies": {
-    "@types/socket.io-client": "^1.4.33",
+    "@types/socket.io-client": "^1.4.36",
     "@types/uuid": "^8.3.0",
     "rollup-plugin-babel": "^4.4.0",
     "rollup-plugin-node-globals": "^1.4.0",
