@@ -11,7 +11,7 @@
     "lodash": "^4.17.19",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
-    "react-scripts": "3.4.1",
+    "react-scripts": "3.4.3",
     "react-virtualized": "^9.21.2",
     "twake-collections-client": "file:../../client",
     "typescript": "~3.7.2"
